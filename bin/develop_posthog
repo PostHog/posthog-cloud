@@ -2,6 +2,7 @@ rm -rf deploy
 mkdir deploy
 curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C deploy --
 ln -s "$(pwd)"/multi_tenancy "$(pwd)"/deploy/
+ln -s "$(pwd)"/mail_app "$(pwd)"/deploy/
 
 cat "$(pwd)"/multi_tenancy_settings.py >> "$(pwd)"/deploy/posthog/settings.py
 
