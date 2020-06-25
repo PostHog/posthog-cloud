@@ -1,11 +1,10 @@
 from mail_app.models.follow_up_email import FollowUpEmail
 from django.core.management.base import BaseCommand
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from django.core.mail import send_mail
 
 from django.conf import settings
 
-from posthog.models import Event, Team
+from posthog.models import Event, Team, User
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import pytz
@@ -20,27 +19,21 @@ class Command(BaseCommand):
             team_has_events = Event.objects.filter(team=team).exists()
             count = FollowUpEmail.objects.filter(team_id=team.pk).count()
             delta = datetime.now(pytz.utc) - team.created_at
-
             if not team_has_events and delta.days >= 2 and team.created_at and count < 1:
                 self._send_follow_up_to_team(team, count)
 
     def _send_follow_up_to_team(self, team: Team, count: int):
         for user in team.users.all():
-            self._send_follow_up_to_user(user.email)
+            self._send_follow_up_to_user(user)
         
         FollowUpEmail.objects.create(team_id=team.pk)
     
-    def _send_follow_up_to_user(self, email: str):
-        message = Mail(
-            from_email='eric@posthog.com',
-            to_emails=email,
-            subject='Follow Up Email',
-            html_content='Looks like you haven\'t started sending events with Posthog yet. Want a demo?')
+    def _send_follow_up_to_user(self, recipient: User):
         try:
-            if settings.SENDGRID_API_KEY:
-                sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-                sg.send(message)
-            else: 
-                raise Exception("No Sendgrid Key")
-        except Exception as e:
-            print(e)
+            send_mail(
+                'Follow Up Email',
+                'Hi {}, \n\nLooks like you haven\'t started sending events with Posthog yet. Let us know if you want a demo from the team! We\'re happy to get you started on Posthog?'.format(recipient.first_name),
+                settings.DEFAULT_FROM_EMAIL,
+                [recipient.email])
+        except:
+            pass
