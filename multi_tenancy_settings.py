@@ -1,4 +1,5 @@
-# These settings get copied by bin/pull_posthog into the end of settings.py of the main PostHog code base.
+# These settings are appended by bin/pull_posthog to the end of settings.py of the main PostHog code base
+# Undefined variable warnings are expected
 
 MULTI_TENANCY = os.environ.get("MULTI_TENANCY", True)
 
@@ -15,9 +16,6 @@ if (
     and isinstance(TEMPLATES[0]["DIRS"], list)
 ):
     TEMPLATES[0]["DIRS"].append("multi_tenancy/templates")
-
-# SendGrid
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 
 # Stripe
 # https://github.com/stripe/stripe-python
