@@ -1,2 +1,6 @@
 deploy
 env
+*.pyc
+.DS_Store
+.vscode/*
+.idea/

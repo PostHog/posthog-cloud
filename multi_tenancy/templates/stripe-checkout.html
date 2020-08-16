@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PostHog | Setup Billing</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script type="text/javascript">
+      const getParameterByName = (name) => {
+        const url = window.location.href;
+        name = name.replace(/[\[\]]/g, "\\$&");
+        const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+          results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return "";
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+      };
+
+      const session_id = getParameterByName("session_id");
+      if (!session_id) window.location.href = "/";
+      const stripe = Stripe("{{STRIPE_PUBLISHABLE_KEY}}");
+      stripe
+        .redirectToCheckout({
+          sessionId: session_id,
+        })
+        .then(function (result) {
+          document.getElementById("msg").innerHTML = result.error.message;
+        });
+    </script>
+  </head>
+  <body>
+    <div id="msg">Please wait while we redirect you.</div>
+  </body>
+</html>

@@ -5,3 +5,4 @@ cp -r multi_tenancy deploy/
 cp -r mail_app deploy/
 
 cat multi_tenancy_settings.py >> deploy/posthog/settings.py
+cat requirements.txt >> deploy/requirements.txt
