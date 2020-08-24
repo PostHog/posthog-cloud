@@ -1,3 +1,4 @@
+from typing import List
 from posthog.urls import urlpatterns as posthog_urls, home
 from django.urls import path, re_path
 from django.contrib.auth import decorators
@@ -12,13 +13,17 @@ from multi_tenancy.views import (
     stripe_webhook,
 )
 
+# Include `posthog-production` override routes first
+urlpatterns: List = [
+    path(
+        "api/user/", user_with_billing
+    )  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
+]
 
-urlpatterns = posthog_urls[:-1]
-urlpatterns[5] = path(
-    "api/user/", user_with_billing
-)  # Override to include billing information
+# Include `posthog` default routes, except the home route (to give precendence to billing routes)
+url_patterns += posthog_urls[:-1] # Remove 
 
-
+# Include `posthog-production` routes and the home route as fallback
 urlpatterns += [
     path("signup", signup_view, name="signup"),
     path(
@@ -39,5 +44,5 @@ urlpatterns += [
     path(
         "billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"
     ),  # Stripe Webhook
-    re_path(r"^.*", decorators.login_required(home)),
+    re_path(r"^.*", decorators.login_required(home)), # Should always be at the very last position
 ]
