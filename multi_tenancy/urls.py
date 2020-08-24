@@ -21,7 +21,7 @@ urlpatterns: List = [
 ]
 
 # Include `posthog` default routes, except the home route (to give precendence to billing routes)
-urlpatterns += posthog_urls[:-1] # Remove 
+urlpatterns += posthog_urls[:-1]
 
 # Include `posthog-production` routes and the home route as fallback
 urlpatterns += [
