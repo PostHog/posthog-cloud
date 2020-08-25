@@ -7,6 +7,7 @@ ROOT_URLCONF = "multi_tenancy.urls"
 if INSTALLED_APPS and isinstance(INSTALLED_APPS, list):
 
     INSTALLED_APPS.append("multi_tenancy.apps.MultiTenancyConfig")
+    INSTALLED_APPS.append("messaging.apps.MessagingConfig")
 
 if (
     TEMPLATES
