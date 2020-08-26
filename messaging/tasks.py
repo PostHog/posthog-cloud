@@ -1,8 +1,10 @@
 from celery import shared_task
-from posthog.models import User, Team
-from django.core.validators import EmailValidator
 from django.core.exceptions import ValidationError
-from .mail import Mail    
+from django.core.validators import EmailValidator
+
+from posthog.models import Team, User
+
+from .mail import Mail
 
 
 @shared_task
@@ -39,4 +41,4 @@ def process_team_signup_messaging(user_id: int, team_id: int) -> None:
     """
     
     # Send event ingestion follow up in 3 hours (if no events have been ingested yet)
-    send_event_ingestion_follow_up.apply_async((user_id, team_id), countdown=10800)
+    check_and_send_event_ingestion_follow_up.apply_async((user_id, team_id), countdown=10800)

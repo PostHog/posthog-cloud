@@ -10,6 +10,7 @@ from posthog.models import User, Team
 from posthog.api.user import user
 from multi_tenancy.models import TeamBilling
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
+from messaging.tasks import process_team_signup_messaging
 import json
 import logging
 import datetime
@@ -59,6 +60,7 @@ def signup_view(request: HttpRequest):
                 "name": user.first_name,
             },
         )
+        process_team_signup_messaging.delay(user_id=user.pk, team_id=team.pk)
         return redirect("/")
 
 
@@ -132,12 +134,16 @@ def billing_welcome_view(request: HttpRequest):
 def billing_failed_view(request: HttpRequest):
     return render_template("billing-failed.html", request)
 
+
 def billing_hosted_view(request: HttpRequest):
     return render_template("billing-hosted.html", request)
 
+
 def stripe_webhook(request: HttpRequest) -> JsonResponse:
     response: JsonResponse = JsonResponse({"success": True}, status=status.HTTP_200_OK)
-    error_response: JsonResponse = JsonResponse({"success": False}, status=status.HTTP_400_BAD_REQUEST)
+    error_response: JsonResponse = JsonResponse(
+        {"success": False}, status=status.HTTP_400_BAD_REQUEST
+    )
     signature: str = request.META.get("HTTP_STRIPE_SIGNATURE", "")
     event: Dict = parse_webhook(request.read(), signature)
 
@@ -177,7 +183,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         except KeyError:
             # Malformed request
             return error_response
-    
+
     else:
         return error_response
 
