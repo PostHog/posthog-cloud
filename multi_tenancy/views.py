@@ -29,7 +29,6 @@ def signup_view(request: HttpRequest):
         email = request.POST["email"]
         password = request.POST["password"]
         company_name = request.POST.get("company_name")
-        is_first_user = not User.objects.exists()
         try:
             user = User.objects.create_user(
                 email=email, password=password, first_name=request.POST.get("name")
@@ -50,7 +49,7 @@ def signup_view(request: HttpRequest):
         posthoganalytics.capture(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": is_first_user},
+            properties={"is_first_user": False, "is_team_first_user": True},
         )
         posthoganalytics.identify(
             user.distinct_id,
