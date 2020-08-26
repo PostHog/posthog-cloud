@@ -33,6 +33,8 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
-            user.distinct_id, "user signed up", properties={"is_first_user": True}
+            user.distinct_id,
+            "user signed up",
+            properties={"is_first_user": True, "is_team_first_user": True},
         )
 
