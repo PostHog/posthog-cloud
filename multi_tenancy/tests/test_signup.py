@@ -35,6 +35,6 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": True, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_team_first_user": True},
         )
 
