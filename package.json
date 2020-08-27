@@ -2,7 +2,7 @@
   "name": "posthog-production",
   "version": "1.0.0",
   "scripts": {
-    "heroku-postbuild": "bin/pull_posthog && cd deploy && npm install --dev && npm run build && cp requirements.txt ../",
+    "heroku-postbuild": "bin/pull_main && cd deploy && npm install --dev && npm run build && cp requirements.txt ../",
     "build": ""
   },
   "cacheDirectories": [

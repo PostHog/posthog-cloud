@@ -27,7 +27,7 @@ jobs:
           python-version: '3.x'
 
       - name: Fetch posthog main repo
-        run: bin/pull_posthog
+        run: bin/pull_main
 
       - name: Set up dependencies caching
         uses: actions/cache@v2

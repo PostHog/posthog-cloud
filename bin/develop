@@ -1,3 +1,5 @@
+#!/bin/bash
+
 rm -rf deploy
 mkdir deploy
 curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C deploy --

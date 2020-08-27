@@ -34,7 +34,7 @@
       "heroku-postgresql"
   ],
   "scripts": {
-      "postdeploy": "bin/pull_posthog && cd deploy && pip install -r requirements.txt && cd frontend && yarn install && yarn build"
+      "postdeploy": "bin/pull_main && cd deploy && pip install -r requirements.txt && cd frontend && yarn install && yarn build"
   },
   "formation": {
       "web": {

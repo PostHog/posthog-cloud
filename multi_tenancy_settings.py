@@ -1,4 +1,4 @@
-# These settings get copied by bin/pull_posthog into the end of settings.py of the main PostHog code base.
+# These settings get copied by bin/pull_main into the end of settings.py of the main PostHog code base.
 
 MULTI_TENANCY = os.environ.get("MULTI_TENANCY", True)
 
