@@ -10,4 +10,4 @@ cat "$(pwd)"/requirements.txt >> "$(pwd)"/deploy/requirements.txt
 cd deploy
 pip install -r requirements/dev.txt
 pip install -r requirements.txt
-yarn install # to run husky when creating a git commit
+yarn # to run husky when creating a git commit
