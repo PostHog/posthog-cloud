@@ -1,44 +1,32 @@
 from celery import shared_task
 from django.core.exceptions import ValidationError
-from django.core.validators import EmailValidator
+from django.core.validators import validate_email
 
 from posthog.models import Team, User
 
 from .mail import Mail
 
-
 @shared_task
 def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None:
-    """
-    Will send a follow up email to any user that has signed up for a team that has not ingested events.
-    """
-
-    validator = EmailValidator()
-
+    """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
     user = User.objects.get(pk=user_id)
     team = Team.objects.get(pk=team_id)
-
-    # If user has anonymized their data or the email is invalid we ignore it
+    # If user has anonymized their data, email unwanted
     if user.anonymize_data:
         return
-    
+    # If team has ingested events, email unnecessary
+    if team.event_set.exists():
+        return
+    # If user's email address is invalid, email impossible
     try:
-        validator(user.email)
+        validate_email(user.email)
     except ValidationError:
         return
-
-    if team.event_set.exists():
-        # Team has ingested events, no email necessary
-        return
-    
-    Mail.send_event_ingestion_follow_up(user.email)
+    Mail.send_event_ingestion_follow_up(user.email, user.first_name)
 
 
 @shared_task
 def process_team_signup_messaging(user_id: int, team_id: int) -> None:
-    """
-    Processes any logic related to messaging after a user signs up for an account.
-    """
-    
-    # Send event ingestion follow up in 3 hours (if no events have been ingested yet)
+    """Process messaging of signed-up users."""
+    # Send event ingestion follow up in 3 hours (if no events have been ingested by that time)
     check_and_send_event_ingestion_follow_up.apply_async((user_id, team_id), countdown=10800)
