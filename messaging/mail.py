@@ -37,7 +37,7 @@ class Mail:
         Best,
         PostHog Team
 
-        P.S. If you'd prefer not to hear from us, unsubscribe here: %tag_unsubscribe_url%
+        P.S. If you'd prefer not to receive suggestions like this one from us, unsubscribe here: %tag_unsubscribe_url%
         """
 
         html_message: str = f"""
@@ -60,7 +60,7 @@ class Mail:
         Best,<br/>
         PostHog Team<br/>
         <br/>
-        P.S. If you'd prefer not to hear from us, <a href="%tag_unsubscribe_url%">unsubscribe here</a>.
+        P.S. If you'd prefer not to receive suggestions like this one from us, <a href="%tag_unsubscribe_url%">unsubscribe here</a>.
         """
 
         pattern = re.compile("[^a-zA-Z0-9 ]+")
