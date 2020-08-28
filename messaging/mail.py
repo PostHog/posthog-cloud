@@ -72,4 +72,4 @@ class Mail:
             headers=cls.EMAIL_HEADERS,
         )
         message.attach_alternative(html_message, "text/html")
-        message.send(fail_silently=False)
+        message.send()
