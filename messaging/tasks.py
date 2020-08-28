@@ -5,6 +5,8 @@ from django.core.validators import validate_email
 from posthog.models import Team, User
 
 from .mail import Mail
+import posthoganalytics
+
 
 @shared_task
 def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None:
@@ -24,9 +26,13 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
         return
     Mail.send_event_ingestion_follow_up(user.email, user.first_name)
 
+    posthoganalytics.capture(user.distinct_id, "sent event ingestion email")
+
 
 @shared_task
 def process_team_signup_messaging(user_id: int, team_id: int) -> None:
     """Process messaging of signed-up users."""
     # Send event ingestion follow up in 3 hours (if no events have been ingested by that time)
-    check_and_send_event_ingestion_follow_up.apply_async((user_id, team_id), countdown=10800)
+    check_and_send_event_ingestion_follow_up.apply_async(
+        (user_id, team_id), countdown=10800
+    )
