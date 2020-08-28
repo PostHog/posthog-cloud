@@ -19,11 +19,14 @@ class TestMessaging(BaseTest):
             check_and_send_event_ingestion_follow_up(self.user.pk, self.team.pk)
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].subject, "Need any help getting set up?")
+        self.assertEqual(mail.outbox[0].subject, "Product insights with PostHog are waiting for you")
         self.assertEqual(mail.outbox[0].from_email, "PostHog Team <hey@posthog.com>")
         self.assertEqual(mail.outbox[0].to, ["test@posthog.com"])
         self.assertIn(
-            "happy to help if you have any questions", mail.outbox[0].body,
+            "haven't started receiving events yet", mail.outbox[0].body,
+        )
+        self.assertIn(
+            " We'd be delighted to help you any way we can", mail.outbox[0].body,
         )
         self.assertIn(
             "https://app.posthog.com", mail.outbox[0].body,
