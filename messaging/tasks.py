@@ -25,8 +25,7 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
     except ValidationError:
         return
     Mail.send_event_ingestion_follow_up(user.email, user.first_name)
-
-    posthoganalytics.capture(user.distinct_id, "sent event ingestion email")
+    posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
 
 
 @shared_task
