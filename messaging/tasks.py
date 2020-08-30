@@ -14,13 +14,6 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
     """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
     user = User.objects.get(pk=user_id)
     team = Team.objects.get(pk=team_id)
-    try:
-        emailed_user = EmailedUser.objects.get(user_id=user_id)
-        user_has_been_emailed = emailed_user.has_received_email
-    except EmailedUser.DoesNotExist:
-        user_has_been_emailed = False
-    # If user already got a follow-up, email unwanted
-    if user_has_been_emailed: return
     # If user has anonymized their data, email unwanted
     if user.anonymize_data: return
     # If team has ingested events, email unnecessary
@@ -30,8 +23,15 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
         validate_email(user.email)
     except ValidationError:
         return
+    # If user already received a follow-up, email unwanted
+    try:
+        emailed_user = EmailedUser.objects.get(user_email=user.email)
+        user_has_been_emailed = emailed_user.has_received_email
+    except EmailedUser.DoesNotExist:
+        user_has_been_emailed = False
+    if user_has_been_emailed: return
     Mail.send_event_ingestion_follow_up(user.email, user.first_name)
-    EmailedUser(user_id=user_id, has_received_email=True)
+    EmailedUser(user_email=user.email, has_received_email=True)
     posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
 
 

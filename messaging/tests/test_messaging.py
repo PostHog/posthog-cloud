@@ -4,6 +4,7 @@ from messaging.tasks import check_and_send_event_ingestion_follow_up
 from posthog.api.test.base import BaseTest
 from posthog.models import Event, Team, User
 
+from ..models import EmailedUser
 
 class TestMessaging(BaseTest):
     @classmethod
@@ -67,7 +68,6 @@ class TestMessaging(BaseTest):
         user: User = User.objects.create(email="valid@posthog.com")
         self.team.users.add(user)
         self.team.save()
-
-        check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
+        EmailedUser(email="valid@posthog.com", has_received_email=True)
         check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
         self.assertEqual(len(mail.outbox), 1)
