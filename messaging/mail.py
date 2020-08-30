@@ -8,17 +8,16 @@ import re
 
 class Mail:
     FROM_ADDRESS: ClassVar[str] = "PostHog Team <hey@posthog.com>"
-    SLACK_COMMUNITY_LINK: ClassVar[str] = "https://join.slack.com/t/posthogusers/"
-    "shared_invite/en/QtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ"
+    SLACK_COMMUNITY_LINK: ClassVar[str] = "https://join.slack.com/t/posthogusers/shared_invite/en/QtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ"
     DEMO_SESSION_LINK: ClassVar[str] = "https://calendly.com/timgl/30min"
     EMAIL_HEADERS: ClassVar[Dict[str, str]] = {"X-Mailgun-Tag": "product-suggestions"}
 
     @classmethod
-    def send_event_ingestion_follow_up(cls, email: str, name: str) -> None:
+    def send_event_ingestion_follow_up(cls, email_address: str, name: str) -> None:
 
         utm_qs: str = "?utm_medium=email&utm_campaign=event_ingestion_follow_up"
 
-        message: str = f"""
+        content: str = f"""
         Hey,
 
         We've noticed you signed up for PostHog Cloud, but *haven't started receiving events yet*.
@@ -40,7 +39,7 @@ class Mail:
         P.S. If you'd prefer not to receive suggestions like this one from us, unsubscribe here: %tag_unsubscribe_url%
         """
 
-        html_message: str = f"""
+        html_content: str = f"""
         Hey,
         <br/>
         <br/>
@@ -64,12 +63,12 @@ class Mail:
         """
 
         pattern = re.compile("[^a-zA-Z0-9 ]+")
-        message = EmailMultiAlternatives(
+        email_message = EmailMultiAlternatives(
             subject="Product insights with PostHog are waiting for you",
-            body=message,
+            body=content,
             from_email=cls.FROM_ADDRESS,
-            to=[f"{pattern.sub('', name)} <{email}>"],
+            to=[f"{pattern.sub('', name)} <{email_address}>"],
             headers=cls.EMAIL_HEADERS,
         )
-        message.attach_alternative(html_message, "text/html")
-        message.send()
+        email_message.attach_alternative(html_content, "text/html")
+        email_message.send()
