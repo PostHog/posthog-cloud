@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
 from posthog.models import Team, User
-from .models import EmailedUser
+from .models import UserMessagingState
 
 from .mail import Mail
 import posthoganalytics
@@ -12,8 +12,12 @@ import posthoganalytics
 @shared_task
 def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None:
     """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
-    user = User.objects.get(pk=user_id)
+    user = User.objects.select_related('messaging_state').get(pk=user_id)
     team = Team.objects.get(pk=team_id)
+    if user.messaging_state is not None:
+        messaging_state = user.messaging_state
+    else:
+        messaging_state = UserMessagingState(user=user)
     # If user has anonymized their data, email unwanted
     if user.anonymize_data: return
     # If team has ingested events, email unnecessary
@@ -23,16 +27,20 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
         validate_email(user.email)
     except ValidationError:
         return
-    # If user already received a follow-up, email unwanted
+    # If a follow-up email has already been sent, email unwanted
+    if messaging_state.was_no_event_ingestion_mail_sent:
+        return
+
     try:
-        emailed_user = EmailedUser.objects.get(user_email=user.email)
-        user_has_been_emailed = emailed_user.has_received_email
-    except EmailedUser.DoesNotExist:
-        user_has_been_emailed = False
-    if user_has_been_emailed: return
-    Mail.send_event_ingestion_follow_up(user.email, user.first_name)
-    EmailedUser(user_email=user.email, has_received_email=True)
-    posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
+        Mail.send_event_ingestion_follow_up(user.email, user.first_name)
+    except Exception as e:
+        raise e
+    else:
+        messaging_state.was_no_event_ingestion_mail_sent = True
+        posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
+    finally:
+        messaging_state.save()
+
 
 
 @shared_task

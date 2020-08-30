@@ -1,6 +1,12 @@
 from django.db import models
 from django.conf import settings
+from posthog.models import User
 
-class EmailedUser(models.Model):
-    user_email: models.CharField = models.CharField(max_length=400)
-    has_received_email: models.BooleanField = models.BooleanField(default=False)
+class UserMessagingState(models.Model):
+    user: models.OneToOneField = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name='messaging_state'
+    )
+    was_no_event_ingestion_mail_sent: models.BooleanField = models.BooleanField(default=False)
