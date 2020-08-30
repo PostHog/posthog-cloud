@@ -1,10 +1,10 @@
-from typing import ClassVar, Dict
+from typing import ClassVar, Dict, Optional
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
 import re
-
+from .models import UserMessagingRecord
 
 class Mail:
     FROM_ADDRESS: ClassVar[str] = "PostHog Team <hey@posthog.com>"
@@ -12,11 +12,17 @@ class Mail:
     DEMO_SESSION_LINK: ClassVar[str] = "https://calendly.com/timgl/30min"
     EMAIL_HEADERS: ClassVar[Dict[str, str]] = {"X-Mailgun-Tag": "product-suggestions"}
 
+    @staticmethod
+    def utmify_url(url: str, *, campaign: str, content: Optional[str]) -> str:
+        utmified_url = f"{url}{'&' if '?' in url else '?'}utm_source=posthog&utm_medium=email&utm_campaign={campaign}"
+        if content:
+            utmified_url += f"&utm_content={content}"
+        return utmified_url
+        
     @classmethod
-    def send_event_ingestion_follow_up(cls, email_address: str, name: str) -> None:
-
-        utm_qs: str = "?utm_medium=email&utm_campaign=event_ingestion_follow_up"
-
+    def send_no_event_ingestion_follow_up(cls, email_address: str, name: str) -> None:
+        campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
+        
         content: str = f"""
         Hey,
 
@@ -31,7 +37,7 @@ class Mail:
         with PostHog, schedule a demo session whenever you want on {cls.DEMO_SESSION_LINK} 
         – it'd be a pleasure to show you around.
 
-        So, how are you feeling about PostHog? Set it up now – {settings.SITE_URL}{utm_qs}&utm_content=text
+        So, how are you feeling about PostHog? Set it up now – {cls.utmify_url(settings.SITE_URL, campaign=campaign, content="text")}
 
         Best,
         PostHog Team
@@ -54,7 +60,7 @@ class Mail:
         with PostHog, <a href="{cls.DEMO_SESSION_LINK}">schedule a demo session</a> whenever you want 
         – it'd be a pleasure to show you around.<br/>
         <br/>
-        So, how are you feeling about PostHog? <a href="{settings.SITE_URL}{utm_qs}&utm_content=html">Set it up now.</a><br/>
+        So, how are you feeling about PostHog? <a href="{cls.utmify_url(settings.SITE_URL, campaign=campaign, content="html")}">Set it up now.</a><br/>
         <br/>
         Best,<br/>
         PostHog Team<br/>
