@@ -9,4 +9,4 @@ class UserMessagingState(models.Model):
         primary_key=True,
         related_name='messaging_state'
     )
-    was_no_event_ingestion_mail_sent: models.BooleanField = models.BooleanField(default=False)
+    was_event_ingestion_reminder_mail_sent: models.BooleanField = models.BooleanField(default=False)

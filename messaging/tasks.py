@@ -18,6 +18,7 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
         messaging_state = user.messaging_state
     else:
         messaging_state = UserMessagingState(user=user)
+        messaging_state.save()
     # If user has anonymized their data, email unwanted
     if user.anonymize_data: return
     # If team has ingested events, email unnecessary
@@ -28,18 +29,13 @@ def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None
     except ValidationError:
         return
     # If a follow-up email has already been sent, email unwanted
-    if messaging_state.was_no_event_ingestion_mail_sent:
+    if messaging_state.was_event_ingestion_reminder_mail_sent:
         return
 
-    try:
-        Mail.send_event_ingestion_follow_up(user.email, user.first_name)
-    except Exception as e:
-        raise e
-    else:
-        messaging_state.was_no_event_ingestion_mail_sent = True
-        posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
-    finally:
-        messaging_state.save()
+    Mail.send_event_ingestion_follow_up(user.email, user.first_name)
+    messaging_state.was_event_ingestion_reminder_mail_sent = True
+    messaging_state.save()
+    posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
 
 
 
