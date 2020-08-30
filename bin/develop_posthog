@@ -1,15 +1,10 @@
-#!/bin/bash
-
 rm -rf deploy
 mkdir deploy
 curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C deploy --
 ln -s "$(pwd)"/multi_tenancy "$(pwd)"/deploy/
-ln -s "$(pwd)"/messaging "$(pwd)"/deploy/
 
 cat "$(pwd)"/multi_tenancy_settings.py >> "$(pwd)"/deploy/posthog/settings.py
 cat "$(pwd)"/requirements.txt >> "$(pwd)"/deploy/requirements.txt
 
 cd deploy
-pip install -r requirements/dev.txt
 pip install -r requirements.txt
-yarn # to run husky when creating a git commit

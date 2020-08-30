@@ -27,7 +27,7 @@ jobs:
           python-version: '3.x'
 
       - name: Fetch posthog main repo
-        run: bin/pull_main
+        run: bin/pull_posthog
 
       - name: Set up dependencies caching
         uses: actions/cache@v2
@@ -60,7 +60,7 @@ jobs:
           DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
           REDIS_URL: 'redis://localhost'
         run: |
-          source env.template
+          export $(<env.template)
           cd deploy
           mkdir -p frontend/dist
           touch frontend/dist/index.html

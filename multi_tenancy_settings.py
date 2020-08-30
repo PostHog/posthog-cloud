@@ -1,4 +1,4 @@
-# These settings get copied by bin/pull_main into the end of settings.py of the main PostHog code base.
+# These settings get copied by bin/pull_posthog into the end of settings.py of the main PostHog code base.
 
 MULTI_TENANCY = os.environ.get("MULTI_TENANCY", True)
 
@@ -7,7 +7,6 @@ ROOT_URLCONF = "multi_tenancy.urls"
 if INSTALLED_APPS and isinstance(INSTALLED_APPS, list):
 
     INSTALLED_APPS.append("multi_tenancy.apps.MultiTenancyConfig")
-    INSTALLED_APPS.append("messaging.apps.MessagingConfig")
 
 if (
     TEMPLATES
