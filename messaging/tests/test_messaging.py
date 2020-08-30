@@ -62,3 +62,12 @@ class TestMessaging(BaseTest):
 
         check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(self):
+        user: User = User.objects.create(email="valid@posthog.com")
+        self.team.users.add(user)
+        self.team.save()
+
+        check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
+        check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
+        self.assertEqual(len(mail.outbox), 1)
