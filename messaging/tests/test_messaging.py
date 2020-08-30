@@ -1,10 +1,13 @@
 from django.core import mail
+from django.db.utils import IntegrityError
+from django.utils import timezone
 
 from messaging.tasks import check_and_send_event_ingestion_follow_up
 from posthog.api.test.base import BaseTest
 from posthog.models import Event, Team, User
 
-from ..models import UserMessagingState
+from ..models import UserMessagingRecord
+
 
 class TestMessaging(BaseTest):
     @classmethod
@@ -16,6 +19,17 @@ class TestMessaging(BaseTest):
         )
         cls.team.users.add(cls.user)
         cls.team.save()
+
+    def test_cannot_send_the_same_campaign_twice_to_the_same_user(self):
+        user: User = User.objects.create(email="valid@posthog.com")
+        UserMessagingRecord.objects.create(user=user, campaign="test_campaign")
+
+        with self.assertRaises(IntegrityError) as e:
+            UserMessagingRecord.objects.create(user=user, campaign="test_campaign")
+        self.assertIn(
+            'duplicate key value violates unique constraint "messaging_usermessagingrecord',
+            str(e.exception),
+        )
 
     def test_check_and_send_event_ingestion_follow_up(self):
         with self.settings(SITE_URL="https://app.posthog.com"):
@@ -64,10 +78,25 @@ class TestMessaging(BaseTest):
         check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(self):
+    def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(
+        self,
+    ):
         user: User = User.objects.create(email="valid@posthog.com")
         self.team.users.add(user)
         self.team.save()
-        UserMessagingState(user=user, has_received_email=True).save()
+
+        for i in range(0, 3):
+            check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
+        self.assertEqual(len(mail.outbox), 1)  # just one email was sent
+
+    def test_event_ingestion_email_is_sent_again_if_previous_attempt_failed(self,):
+        user: User = User.objects.create(email="valid@posthog.com")
+        self.team.users.add(user)
+        self.team.save()
+        UserMessagingRecord.objects.create(
+            user=user,
+            campaign="no_event_ingestion_follow_up",  # sent_at = None (i.e. has not been sent)
+        )
+
         check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(mail.outbox), 1)  # email was sent

@@ -1,9 +1,11 @@
 from celery import shared_task
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.utils import timezone
+from django.db import transaction
 
 from posthog.models import Team, User
-from .models import UserMessagingState
+from .models import UserMessagingRecord
 
 from .mail import Mail
 import posthoganalytics
@@ -12,31 +14,42 @@ import posthoganalytics
 @shared_task
 def check_and_send_event_ingestion_follow_up(user_id: int, team_id: int) -> None:
     """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
-    user = User.objects.select_related('messaging_state').get(pk=user_id)
-    team = Team.objects.get(pk=team_id)
-    if user.messaging_state is not None:
-        messaging_state = user.messaging_state
-    else:
-        messaging_state = UserMessagingState(user=user)
-        messaging_state.save()
+
+    campaign_id: str = "no_event_ingestion_follow_up"
+    user: User = User.objects.get(pk=user_id)
+    team: Team = Team.objects.get(pk=team_id)
+
     # If user has anonymized their data, email unwanted
-    if user.anonymize_data: return
+    if user.anonymize_data:
+        return
+
     # If team has ingested events, email unnecessary
-    if team.event_set.exists(): return
+    if team.event_set.exists():
+        return
+
     # If user's email address is invalid, email impossible
     try:
         validate_email(user.email)
     except ValidationError:
         return
-    # If a follow-up email has already been sent, email unwanted
-    if messaging_state.was_event_ingestion_reminder_mail_sent:
-        return
 
-    Mail.send_event_ingestion_follow_up(user.email, user.first_name)
-    messaging_state.was_event_ingestion_reminder_mail_sent = True
-    messaging_state.save()
-    posthoganalytics.capture(user.distinct_id, "sent no event ingestion email")
+    record, created = UserMessagingRecord.objects.get_or_create(
+        user=user, campaign=campaign_id
+    )
 
+    with transaction.atomic():
+        # Lock object (database-level) while the message is sent
+        record = UserMessagingRecord.objects.select_for_update().get(pk=record.pk)
+
+        # If an email for this campaign was already sent, email unwanted
+        if record.sent_at:
+            return
+
+        Mail.send_event_ingestion_follow_up(user.email, user.first_name)
+        record.sent_at = timezone.now()
+        record.save()
+
+    posthoganalytics.capture(user.distinct_id, f"sent campaign {campaign_id}")
 
 
 @shared_task

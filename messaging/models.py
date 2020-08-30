@@ -1,12 +1,14 @@
 from django.db import models
-from django.conf import settings
 from posthog.models import User
 
-class UserMessagingState(models.Model):
-    user: models.OneToOneField = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        primary_key=True,
-        related_name='messaging_state'
+
+class UserMessagingRecord(models.Model):
+
+    user: models.ForeignKey = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="messaging_records"
     )
-    was_event_ingestion_reminder_mail_sent: models.BooleanField = models.BooleanField(default=False)
+    campaign: models.CharField = models.CharField(max_length=64)
+    sent_at: models.DateTimeField = models.DateTimeField(null=True, default=None)
+
+    class Meta:
+        unique_together = ("user", "campaign")
