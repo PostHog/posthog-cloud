@@ -68,6 +68,6 @@ class TestMessaging(BaseTest):
         user: User = User.objects.create(email="valid@posthog.com")
         self.team.users.add(user)
         self.team.save()
-        EmailedUser(email="valid@posthog.com", has_received_email=True)
+        EmailedUser(user_email="valid@posthog.com", has_received_email=True)
         check_and_send_event_ingestion_follow_up(user.pk, self.team.pk)
         self.assertEqual(len(mail.outbox), 1)
