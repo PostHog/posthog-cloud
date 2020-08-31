@@ -55,7 +55,7 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int, team_id: int) -> N
 @shared_task
 def process_team_signup_messaging(user_id: int, team_id: int) -> None:
     """Process messaging of signed-up users."""
-    # Send event ingestion follow up in 3 hours (if no events have been ingested by that time)
+    # Send event ingestion follow-up in 24 hours, if no events have been ingested by that time
     check_and_send_no_event_ingestion_follow_up.apply_async(
-        (user_id, team_id), countdown=10800
+        (user_id, team_id), countdown=86_400
     )
