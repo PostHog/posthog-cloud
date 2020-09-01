@@ -17,7 +17,8 @@ from multi_tenancy.views import (
 urlpatterns: List = [
     path(
         "api/user/", user_with_billing
-    )  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
+    ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
+    path("signup", signup_view, name="signup"), # TODO: Temp to prevent breaking app.posthog.com with https://github.com/PostHog/posthog/pull/1535
 ]
 
 # Include `posthog` default routes, except the home route (to give precendence to billing routes)
@@ -25,7 +26,6 @@ urlpatterns += posthog_urls[:-1]
 
 # Include `posthog-production` routes and the home route as fallback
 urlpatterns += [
-    path("signup", signup_view, name="signup"),
     path(
         "billing/setup", stripe_checkout_view, name="billing_setup"
     ),  # Redirect to Stripe Checkout to set-up billing (requires session ID)
