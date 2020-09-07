@@ -16,7 +16,7 @@ if (
     and isinstance(TEMPLATES[0]["DIRS"], list)
 ):
 
-    TEMPLATES[0]["DIRS"].append("multi_tenancy/templates")
+    TEMPLATES[0]["DIRS"].insert(0, "multi_tenancy/templates")
 
 
 # Stripe settings
