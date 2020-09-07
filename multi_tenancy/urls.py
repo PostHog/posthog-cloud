@@ -7,6 +7,7 @@ from posthog.urls import home
 from posthog.urls import urlpatterns as posthog_urls
 
 from .views import (
+    MultiTenancyTeamSignupViewset,
     billing_failed_view,
     billing_hosted_view,
     billing_welcome_view,
@@ -21,6 +22,9 @@ urlpatterns: List = [
     path(
         "api/user/", user_with_billing,
     ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
+    path(
+        "api/team/signup/", MultiTenancyTeamSignupViewset.as_view()
+    ),  # Override to support setting a billing plan on signup
 ]
 
 # Include `posthog` default routes, except the home route (to give precendence to billing routes)

@@ -11,13 +11,17 @@ from rest_framework import status
 
 from multi_tenancy.models import TeamBilling
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
+from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
 from posthog.urls import render_template
 
+from .serializers import MultiTenancyTeamSignupSerializer
 
 logger = logging.getLogger(__name__)
 
 
+class MultiTenancyTeamSignupViewset(TeamSignupViewset):
+    serializer_class = MultiTenancyTeamSignupSerializer
 
 
 def user_with_billing(request: HttpRequest):
