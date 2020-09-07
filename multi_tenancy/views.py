@@ -1,66 +1,23 @@
-from typing import Dict
-from posthog.urls import render_template
-from django.http import JsonResponse, HttpResponse, HttpRequest
-from django.conf import settings
-from django.contrib.auth import login
-from django.shortcuts import redirect
-from rest_framework import status
-from rest_framework import exceptions
-from posthog.models import User, Team
-from posthog.api.user import user
-from multi_tenancy.models import TeamBilling
-from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
-from messaging.tasks import process_team_signup_messaging
+import datetime
 import json
 import logging
-import datetime
+from typing import Dict
+
 import pytz
-import posthoganalytics
+from django.conf import settings
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import redirect
+from rest_framework import status
+
+from multi_tenancy.models import TeamBilling
+from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
+from posthog.api.user import user
+from posthog.urls import render_template
+
 
 logger = logging.getLogger(__name__)
 
 
-def signup_view(request: HttpRequest):
-    if request.method == "GET":
-        if request.user.is_authenticated:
-            return redirect("/")
-        return render_template("signup.html", request)
-    if request.method == "POST":
-        email = request.POST["email"]
-        password = request.POST["password"]
-        company_name = request.POST.get("company_name")
-        try:
-            user = User.objects.create_user(
-                email=email, password=password, first_name=request.POST.get("name")
-            )
-        except:
-            return render_template(
-                "signup.html",
-                request=request,
-                context={
-                    "error": True,
-                    "email": request.POST["email"],
-                    "company_name": request.POST.get("company_name"),
-                    "name": request.POST.get("name"),
-                },
-            )
-        team = Team.objects.create_with_data(users=[user], name=company_name)
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        posthoganalytics.capture(
-            user.distinct_id,
-            "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
-        )
-        posthoganalytics.identify(
-            user.distinct_id,
-            properties={
-                "email": user.email,
-                "company_name": company_name,
-                "name": user.first_name,
-            },
-        )
-        process_team_signup_messaging.delay(user_id=user.pk, team_id=team.pk)
-        return redirect("/")
 
 
 def user_with_billing(request: HttpRequest):
@@ -187,4 +144,3 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         return error_response
 
     return response
-
