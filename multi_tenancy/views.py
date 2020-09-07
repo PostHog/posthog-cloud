@@ -35,7 +35,7 @@ def user_with_billing(request: HttpRequest):
     if response.status_code == 200:
         # TO-DO: (Future) Handle user having multiple teams
         instance, created = TeamBilling.objects.get_or_create(
-            team=request.user.team_set.first()
+            team=request.user.team_set.first(),
         )
 
         if instance.should_setup_billing and not instance.is_billing_active:
@@ -132,11 +132,8 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                     )
 
                 instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
-                    line_items[0]["period"]["end"]
+                    line_items[0]["period"]["end"],
                 ).replace(tzinfo=pytz.utc)
-
-                # Update the price_id too.
-                instance.price_id = line_items[0]["price"]["id"]
 
                 instance.save()
 

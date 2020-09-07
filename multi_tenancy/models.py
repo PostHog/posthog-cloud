@@ -9,7 +9,9 @@ class Plan(models.Model):
         max_length=32, unique=True, db_index=True,
     )
     name: models.CharField = models.CharField(max_length=128)
-    default_should_setup_billing: models.BooleanField = models.BooleanField()
+    default_should_setup_billing: models.BooleanField = models.BooleanField(
+        default=False,
+    )
     price_id: models.CharField = models.CharField(
         max_length=128, blank=True, default="",
     )
@@ -29,10 +31,13 @@ class TeamBilling(models.Model):
     plan: models.ForeignKey = models.ForeignKey(
         Plan, on_delete=models.PROTECT, null=True,
     )
-    price_id: models.CharField = models.CharField(
-        max_length=128, blank=True, default="",
-    )
 
     @property
     def is_billing_active(self):
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
+
+    @property
+    def price_id(self):
+        if self.plan:
+            return self.plan.price_id
+        return ""
