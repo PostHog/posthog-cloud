@@ -14,6 +14,74 @@ class TestTeamSignup(TransactionBaseTest):
             email="firstuser@posthog.com",
         )  # to ensure consistency in tests
 
+    @patch("posthog.api.team.EE_MISSING", True)
+    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("posthog.api.team.posthoganalytics.identify")
+    @patch("posthog.api.team.posthoganalytics.capture")
+    def test_api_sign_up(self, mock_capture, mock_identify, mock_messaging):
+        """
+        Overridden from posthog.api.test.test_team to patch Redis call. Original test will not be run
+        on multitenancy.
+        """
+        response = self.client.post(
+            "/api/team/signup/",
+            {
+                "first_name": "John",
+                "email": "hedgehog@posthog.com",
+                "password": "notsecure",
+                "company_name": "Hedgehogs United, LLC",
+                "email_opt_in": False,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user: User = User.objects.order_by("-pk")[0]
+        team: Team = user.team_set.all()[0]
+        self.assertEqual(
+            response.data,
+            {
+                "id": user.pk,
+                "distinct_id": user.distinct_id,
+                "first_name": "John",
+                "email": "hedgehog@posthog.com",
+            },
+        )
+
+        # Assert that the user was properly created
+        self.assertEqual(user.first_name, "John")
+        self.assertEqual(user.email, "hedgehog@posthog.com")
+        self.assertEqual(user.email_opt_in, False)
+
+        # Assert that the team was properly created
+        self.assertEqual(team.name, "Hedgehogs United, LLC")
+
+        # Assert that the sign up event & identify calls were sent to PostHog analytics
+        mock_capture.assert_called_once_with(
+            user.distinct_id,
+            "user signed up",
+            properties={"is_first_user": False, "is_team_first_user": True},
+        )
+
+        mock_identify.assert_called_once_with(
+            user.distinct_id,
+            properties={
+                "email": "hedgehog@posthog.com",
+                "realm": "cloud",
+                "ee_available": False,
+            },
+        )
+
+        # Assert that the user is logged in
+        response = self.client.get("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["email"], "hedgehog@posthog.com")
+
+        # Assert that the password was correctly saved
+        self.assertTrue(user.check_password("notsecure"))
+
+        # Check that the process_team_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_team_signup_messaging.delay")
     def test_default_user_sign_up(self, mock_messaging, mock_capture):
@@ -93,7 +161,8 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
     @patch("posthoganalytics.capture")
-    def test_user_can_sign_up_with_an_invalid_plan(self, mock_capture):
+    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    def test_user_can_sign_up_with_an_invalid_plan(self, mock_messaging, mock_capture):
 
         response = self.client.post(
             "/api/team/signup/",
@@ -120,4 +189,71 @@ class TestTeamSignup(TransactionBaseTest):
             user.distinct_id,
             "user signed up",
             properties={"is_first_user": False, "is_team_first_user": True},
+        )
+
+        # Check that the process_team_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+
+    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("posthog.api.team.posthoganalytics.identify")
+    @patch("posthog.api.team.posthoganalytics.capture")
+    def test_sign_up_multiple_teams_multi_tenancy(
+        self, mock_capture, mock_identify, mock_messaging,
+    ):
+
+        # Create a user first to make sure additional users can be created
+        User.objects.create(email="i_was_first@posthog.com")
+
+        response = self.client.post(
+            "/api/team/signup/",
+            {
+                "first_name": "John",
+                "email": "multi@posthog.com",
+                "password": "eruceston",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user: User = User.objects.order_by("-pk")[0]
+        self.assertEqual(
+            response.data,
+            {
+                "id": user.pk,
+                "distinct_id": user.distinct_id,
+                "first_name": "John",
+                "email": "multi@posthog.com",
+            },
+        )
+
+        # Assert that the user was properly created
+        self.assertEqual(user.first_name, "John")
+        self.assertEqual(user.email, "multi@posthog.com")
+
+        # Assert that the sign up event & identify calls were sent to PostHog analytics
+        mock_capture.assert_called_once_with(
+            user.distinct_id,
+            "user signed up",
+            properties={"is_first_user": False, "is_team_first_user": True},
+        )
+
+        mock_identify.assert_called_once_with(
+            user.distinct_id,
+            properties={
+                "email": "multi@posthog.com",
+                "realm": "cloud",
+                "ee_available": True,
+            },
+        )
+
+        # Assert that the user is logged in
+        response = self.client.get("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["email"], "multi@posthog.com")
+
+        # Assert that the password was correctly saved
+        self.assertTrue(user.check_password("eruceston"))
+
+        # Check that the process_team_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(
+            user_id=user.pk, team_id=user.team_set.all()[0].pk,
         )
