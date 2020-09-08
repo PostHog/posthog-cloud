@@ -19,7 +19,7 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)
 
-        # TODO: process_team_signup_messaging.delay(user_id=user.pk, team_id=self._team.pk)
+        process_team_signup_messaging.delay(user_id=user.pk, team_id=self._team.pk)
 
         if plan:
             TeamBilling.objects.create(

@@ -52,7 +52,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.json()["email"], "hedgehog5@posthog.com")
 
         # Check that the process_team_signup_messaging task was fired
-        # TODO: mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
 
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_team_signup_messaging.delay")
@@ -83,7 +83,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(team_billing.should_setup_billing, True)
 
         # Check that the process_team_signup_messaging task was fired
-        # TODO: mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
@@ -93,8 +93,7 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
     @patch("posthoganalytics.capture")
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
-    def test_user_can_sign_up_with_an_invalid_plan(self, mock_messaging, mock_capture):
+    def test_user_can_sign_up_with_an_invalid_plan(self, mock_capture):
 
         response = self.client.post(
             "/api/team/signup/",
@@ -113,11 +112,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(user.first_name, "Jane")
         self.assertEqual(user.email, "hedgehog6@posthog.com")
         self.assertFalse(
-            TeamBilling.objects.filter(team=team).exists()
+            TeamBilling.objects.filter(team=team).exists(),
         )  # TeamBilling is not created yet
-
-        # Check that the process_team_signup_messaging task was fired
-        # TODO: mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
