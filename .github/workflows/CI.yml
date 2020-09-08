@@ -18,10 +18,6 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
-      redis:
-        image: redis
-        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
       - uses: actions/checkout@v2
 
@@ -53,7 +49,7 @@ jobs:
         env:
           SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
           DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
-          REDIS_URL: "redis://redis"
+          REDIS_URL: "redis://localhost"
         run: |
           cd deploy
           python manage.py makemigrations --check --dry-run
@@ -62,7 +58,7 @@ jobs:
         env:
           SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          REDIS_URL: "redis://redis"
+          REDIS_URL: "redis://localhost"
         run: |
           source env.template
           cd deploy
