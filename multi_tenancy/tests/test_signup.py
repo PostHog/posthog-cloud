@@ -91,3 +91,37 @@ class TestTeamSignup(TransactionBaseTest):
             "user signed up",
             properties={"is_first_user": False, "is_team_first_user": True},
         )
+
+    @patch("posthoganalytics.capture")
+    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    def test_user_can_sign_up_with_an_invalid_plan(self, mock_messaging, mock_capture):
+
+        response = self.client.post(
+            "/api/team/signup/",
+            {
+                "first_name": "Jane",
+                "email": "hedgehog6@posthog.com",
+                "password": "notsecure",
+                "plan": "NOTVALID",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user: User = User.objects.order_by("-pk")[0]
+        team: Team = user.team_set.all()[0]
+
+        self.assertEqual(user.first_name, "Jane")
+        self.assertEqual(user.email, "hedgehog6@posthog.com")
+        self.assertFalse(
+            TeamBilling.objects.filter(team=team).exists()
+        )  # TeamBilling is not created yet
+
+        # Check that the process_team_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+
+        # Check that we send the sign up event to PostHog analytics
+        mock_capture.assert_called_once_with(
+            user.distinct_id,
+            "user signed up",
+            properties={"is_first_user": False, "is_team_first_user": True},
+        )
