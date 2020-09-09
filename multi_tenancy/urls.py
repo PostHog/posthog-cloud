@@ -20,8 +20,14 @@ from .views import (
 # Include `posthog-production` override routes first
 urlpatterns: List = [
     path(
+        "api/user", user_with_billing,
+    ),  
+    path(
         "api/user/", user_with_billing,
     ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
+    path(
+        "api/team/signup", MultiTenancyTeamSignupViewset.as_view()
+    ),  
     path(
         "api/team/signup/", MultiTenancyTeamSignupViewset.as_view()
     ),  # Override to support setting a billing plan on signup
