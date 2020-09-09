@@ -6,7 +6,7 @@ from django.contrib.auth import login
 from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework import exceptions
-from posthog.models import User, Team
+from posthog.models import User, Team, Organization
 from posthog.api.user import user
 from multi_tenancy.models import TeamBilling
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
@@ -44,7 +44,14 @@ def signup_view(request: HttpRequest):
                     "name": request.POST.get("name"),
                 },
             )
-        team = Team.objects.create_with_data(users=[user], name=company_name)
+
+        organization = Organization.objects.create(name=company_name)
+        organization.members.add(user)
+        team = Team.objects.create_with_data(organization=organization)
+        user.current_organization = organization
+        user.current_team = team
+        user.save()
+
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         posthoganalytics.capture(
             user.distinct_id,
@@ -187,4 +194,3 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         return error_response
 
     return response
-
