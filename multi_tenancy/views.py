@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework import exceptions
 from posthog.models import User, Team, Organization
 from posthog.api.user import user
-from multi_tenancy.models import TeamBilling
+from multi_tenancy.models import OrganizationBilling
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
 from messaging.tasks import process_team_signup_messaging
 import json
@@ -79,9 +79,9 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200:
-        # TO-DO: (Future) Handle user having multiple teams
-        instance, created = TeamBilling.objects.get_or_create(
-            team=request.user.team_set.first()
+        # TODO: Handle multiple organizations
+        instance, created = OrganizationBilling.objects.get_or_create(
+            organization=request.user.organization
         )
 
         if instance.should_setup_billing and not instance.is_billing_active:
@@ -93,7 +93,7 @@ def user_with_billing(request: HttpRequest):
             if checkout_session:
                 output = json.loads(response.content)
 
-                TeamBilling.objects.filter(pk=instance.pk).update(
+                OrganizationBilling.objects.filter(pk=instance.pk).update(
                     stripe_checkout_session=checkout_session,
                     stripe_customer_id=customer_id,
                 )
@@ -121,8 +121,8 @@ def stripe_billing_portal(request: HttpRequest):
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
-    instance, created = TeamBilling.objects.get_or_create(
-        team=request.user.team_set.first()
+    instance, created = OrganizationBilling.objects.get_or_create(
+        organization=request.user.organization
     )
 
     if instance.stripe_customer_id:
@@ -162,8 +162,8 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 customer_id = event["data"]["object"]["customer"]
 
                 try:
-                    instance = TeamBilling.objects.get(stripe_customer_id=customer_id)
-                except TeamBilling.DoesNotExist:
+                    instance = OrganizationBilling.objects.get(stripe_customer_id=customer_id)
+                except OrganizationBilling.DoesNotExist:
                     logger.warning(
                         f"Received invoice.payment_succeeded for {customer_id} but customer is not in the database."
                     )
