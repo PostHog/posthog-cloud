@@ -33,7 +33,7 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200:
-        # TO-DO: (Future) Handle user having multiple teams
+        # TO-DO (Future): Handle user having multiple teams
         instance, created = TeamBilling.objects.get_or_create(
             team=request.user.team_set.first(),
         )
