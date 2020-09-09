@@ -1,6 +1,6 @@
-# PostHog multi-tenancy
+# PostHog Cloud
 
-This repository is used to run our own production cluster of PostHog (app.posthog.com). It enables anyone to sign up to an account and create a new team, 
+This repository is used to run PostHog Cloud (app.posthog.com). It enables anyone to sign up to an account and create their own account along with an organization.
 
 NOTE: This repository is copyrighted, unlike our [main repo](https://github.com/posthog/posthog). You're not allowed to use this code to host your own version of app.posthog.com.
 
