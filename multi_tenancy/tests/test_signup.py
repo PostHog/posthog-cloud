@@ -14,7 +14,6 @@ class TestTeamSignup(TransactionBaseTest):
             email="firstuser@posthog.com",
         )  # to ensure consistency in tests
 
-    @patch("posthog.api.team.EE_MISSING", True)
     @patch("messaging.tasks.process_team_signup_messaging.delay")
     @patch("posthog.api.team.posthoganalytics.identify")
     @patch("posthog.api.team.posthoganalytics.capture")
@@ -23,16 +22,18 @@ class TestTeamSignup(TransactionBaseTest):
         Overridden from posthog.api.test.test_team to patch Redis call. Original test will not be run
         on multitenancy.
         """
-        response = self.client.post(
-            "/api/team/signup/",
-            {
-                "first_name": "John",
-                "email": "hedgehog@posthog.com",
-                "password": "notsecure",
-                "company_name": "Hedgehogs United, LLC",
-                "email_opt_in": False,
-            },
-        )
+
+        with self.settings(EE_AVAILABLE=False):
+            response = self.client.post(
+                "/api/team/signup/",
+                {
+                    "first_name": "John",
+                    "email": "hedgehog@posthog.com",
+                    "password": "notsecure",
+                    "company_name": "Hedgehogs United, LLC",
+                    "email_opt_in": False,
+                },
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
