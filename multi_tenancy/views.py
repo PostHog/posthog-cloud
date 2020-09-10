@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework import exceptions
 from posthog.models import User, Team, Organization
 from posthog.api.user import user
-from multi_tenancy.models import OrganizationBilling
+from multi_tenancy.models import BilledOrganization
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
 from messaging.tasks import process_team_signup_messaging
 import json
@@ -80,7 +80,7 @@ def user_with_billing(request: HttpRequest):
 
     if response.status_code == 200:
         # TODO: Handle multiple organizations
-        instance, created = OrganizationBilling.objects.get_or_create(
+        instance, created = BilledOrganization.objects.get_or_create(
             organization=request.user.organization
         )
 
@@ -93,7 +93,7 @@ def user_with_billing(request: HttpRequest):
             if checkout_session:
                 output = json.loads(response.content)
 
-                OrganizationBilling.objects.filter(pk=instance.pk).update(
+                BilledOrganization.objects.filter(pk=instance.pk).update(
                     stripe_checkout_session=checkout_session,
                     stripe_customer_id=customer_id,
                 )
@@ -121,7 +121,7 @@ def stripe_billing_portal(request: HttpRequest):
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
-    instance, created = OrganizationBilling.objects.get_or_create(
+    instance, created = BilledOrganization.objects.get_or_create(
         organization=request.user.organization
     )
 
@@ -162,8 +162,10 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 customer_id = event["data"]["object"]["customer"]
 
                 try:
-                    instance = OrganizationBilling.objects.get(stripe_customer_id=customer_id)
-                except OrganizationBilling.DoesNotExist:
+                    instance = BilledOrganization.objects.get(
+                        stripe_customer_id=customer_id
+                    )
+                except BilledOrganization.DoesNotExist:
                     logger.warning(
                         f"Received invoice.payment_succeeded for {customer_id} but customer is not in the database."
                     )
