@@ -60,7 +60,7 @@ jobs:
           DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
           REDIS_URL: 'redis://localhost'
         run: |
-          source env.template
+          source .env.template
           cd deploy
           mkdir -p frontend/dist
           touch frontend/dist/index.html

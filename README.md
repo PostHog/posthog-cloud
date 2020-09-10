@@ -17,7 +17,7 @@ We pull in our main repo using the script into the `/deploy` folder. We then cop
     python3 -m venv env
     ```
 1. Run `bin/develop`.
-1. Load the sample environment variables on `env.template`.
+1. Load the sample environment variables on `.env.template`.
 1. cd into `deploy/` and run `bin/start` (this will pre-compile the front-end too).
 1. Tests can be run using `DEBUG=1 bin/tests`.
 
