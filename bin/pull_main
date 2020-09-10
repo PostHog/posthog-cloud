@@ -1,8 +1,12 @@
 #!/bin/bash
 
+echo -e "Purging deploy/...\n"
 rm -rf deploy
 mkdir deploy
-curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C deploy --
+REVISION=${1:-master}
+TARBALL_URL="https://github.com/posthog/posthog/tarball/${REVISION}"
+echo -e "Downloading ${TARBALL_URL}...\n"
+curl -L $TARBALL_URL | tar --strip-components=1 -xz -C deploy --
 cp -r multi_tenancy deploy/
 cp -r messaging deploy/
 
