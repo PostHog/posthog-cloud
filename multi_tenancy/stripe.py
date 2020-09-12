@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Tuple
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 
 import stripe
 
@@ -10,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_subscription(
-    email: str, customer_id: str = "", custom_price_id: str = "",
+    email: str, base_url: str, customer_id: str = "", custom_price_id: str = "",
 ) -> Tuple[str, str]:
 
     if not settings.STRIPE_API_KEY or not settings.STRIPE_DEFAULT_PRICE_ID:
@@ -39,10 +38,8 @@ def create_subscription(
         ],
         "mode": "subscription",
         "customer": customer_id,
-        "success_url": settings.SITE_URL
-        + "/billing/welcome?session_id={CHECKOUT_SESSION_ID}",
-        "cancel_url": settings.SITE_URL
-        + "/billing/failed?session_id={CHECKOUT_SESSION_ID}",
+        "success_url": base_url + "billing/welcome?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": base_url + "billing/failed?session_id={CHECKOUT_SESSION_ID}",
     }
 
     if settings.TEST:

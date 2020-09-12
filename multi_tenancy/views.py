@@ -42,7 +42,10 @@ def user_with_billing(request: HttpRequest):
         if instance.should_setup_billing and not instance.is_billing_active:
 
             checkout_session, customer_id = create_subscription(
-                request.user.email, instance.stripe_customer_id, instance.price_id,
+                request.user.email,
+                request.build_absolute_uri("/"),
+                instance.stripe_customer_id,
+                instance.price_id,
             )
 
             if checkout_session:

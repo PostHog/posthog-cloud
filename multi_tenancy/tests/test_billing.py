@@ -62,7 +62,7 @@ class TestTeamBilling(TransactionBaseTest):
             "billing", response_data,
         )  # key should not be present if should_setup_billing = `False`
 
-    def test_team_that_should_set_up_billing_gets_an_started_checkout_session(self):
+    def test_team_that_should_set_up_billing_starts_a_checkout_session(self):
 
         team, user = self.create_team_and_user()
         instance: TeamBilling = TeamBilling.objects.create(
