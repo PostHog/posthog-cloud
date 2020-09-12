@@ -7,6 +7,7 @@ import pytz
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 
 from multi_tenancy.models import TeamBilling
@@ -99,6 +100,7 @@ def billing_hosted_view(request: HttpRequest):
     return render_template("billing-hosted.html", request)
 
 
+@csrf_exempt
 def stripe_webhook(request: HttpRequest) -> JsonResponse:
     response: JsonResponse = JsonResponse({"success": True}, status=status.HTTP_200_OK)
     error_response: JsonResponse = JsonResponse(

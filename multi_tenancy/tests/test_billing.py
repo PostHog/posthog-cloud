@@ -4,6 +4,7 @@ from typing import Dict
 
 import pytz
 from django.conf import settings
+from django.test import Client
 from django.utils import timezone
 from rest_framework import status
 
@@ -314,10 +315,13 @@ class TestTeamBilling(TransactionBaseTest):
         """
 
         signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
 
-            response = self.client.post(
+            response = csrf_client.post(
                 "/billing/stripe_webhook",
                 body,
                 content_type="text/plain",
