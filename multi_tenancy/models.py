@@ -1,7 +1,10 @@
+from typing import Optional, Tuple
+
 from django.db import models
 from django.utils import timezone
 
-from posthog.models.team import Team
+from multi_tenancy.stripe import create_subscription, create_zero_auth
+from posthog.models import Team, User
 
 
 class Plan(models.Model):
@@ -18,6 +21,29 @@ class Plan(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    def create_checkout_session(
+        self, user: User, team_billing, base_url: str,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Creates a checkout session for the specified plan.
+        Uses any custom logic specific to the plan if configured.
+        """
+
+        if self.key == "startup":
+            # For the startup plan we only do a card validation (no subscription)
+            return create_zero_auth(
+                email=user.email,
+                base_url=base_url,
+                customer_id=team_billing.stripe_customer_id,
+            )
+
+        return create_subscription(
+            email=user.email,
+            base_url=base_url,
+            price_id=self.price_id,
+            customer_id=team_billing.stripe_customer_id,
+        )
 
 
 class TeamBilling(models.Model):

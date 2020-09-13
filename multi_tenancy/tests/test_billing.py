@@ -1,6 +1,7 @@
 import datetime
 import random
 from typing import Dict
+from unittest.mock import patch
 
 import pytz
 from django.core.exceptions import ValidationError
@@ -85,8 +86,11 @@ class TestTeamBilling(TransactionBaseTest):
             "billing", response_data,
         )  # key should not be present if plan = `None`
 
-    def test_team_that_should_set_up_billing_starts_a_checkout_session(self):
-
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_team_that_should_set_up_billing_starts_a_checkout_session(
+        self, mock_customer_id
+    ):
+        mock_customer_id.return_value = "cus_000111222"
         team, user = self.create_team_and_user()
         plan = self.create_plan(custom_setup_billing_message="Sign up now!")
         instance: TeamBilling = TeamBilling.objects.create(
@@ -162,7 +166,10 @@ class TestTeamBilling(TransactionBaseTest):
             },
         )
 
-    def test_warning_is_logged_if_stripe_variables_are_not_properly_configured(self):
+    def test_silent_fail_if_stripe_variables_are_not_properly_configured(self):
+        """
+        If Stripe variables are not properly set, an exception will be sent to Sentry.
+        """
 
         team, user = self.create_team_and_user()
         instance: TeamBilling = TeamBilling.objects.create(
@@ -171,20 +178,14 @@ class TestTeamBilling(TransactionBaseTest):
         self.client.force_login(user)
 
         with self.settings(STRIPE_API_KEY=""):
+            response_data: Dict = self.client.post("/api/user/").json()
 
-            with self.assertLogs("multi_tenancy.stripe") as log:
-                response_data: Dict = self.client.post("/api/user/").json()
-                self.assertEqual(
-                    log.output[0],
-                    "WARNING:multi_tenancy.stripe:Cannot process billing setup because env vars are not properly set.",
-                )
+        self.assertNotIn(
+            "should_setup_billing", response_data["billing"],
+        )
 
-            self.assertNotIn(
-                "should_setup_billing", response_data["billing"],
-            )
-
-            instance.refresh_from_db()
-            self.assertEqual(instance.stripe_checkout_session, "")
+        instance.refresh_from_db()
+        self.assertEqual(instance.stripe_checkout_session, "")
 
     # Manage billing
 

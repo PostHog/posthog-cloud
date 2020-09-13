@@ -5,14 +5,16 @@ from typing import Dict
 
 import pytz
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
+from sentry_sdk import capture_exception
 
 from multi_tenancy.models import TeamBilling
 from multi_tenancy.serializers import PlanSerializer
-from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
+from multi_tenancy.stripe import customer_portal_url, parse_webhook
 from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
 from posthog.urls import render_template
@@ -50,12 +52,18 @@ def user_with_billing(request: HttpRequest):
 
             if instance.should_setup_billing and not instance.is_billing_active:
 
-                checkout_session, customer_id = create_subscription(
-                    email=request.user.email,
-                    base_url=request.build_absolute_uri("/"),
-                    price_id=instance.plan.price_id,
-                    customer_id=instance.stripe_customer_id,
-                )
+                try:
+                    (
+                        checkout_session,
+                        customer_id,
+                    ) = instance.plan.create_checkout_session(
+                        user=request.user,
+                        team_billing=instance,
+                        base_url=request.build_absolute_uri("/"),
+                    )
+                except ImproperlyConfigured as e:
+                    capture_exception(e)
+                    checkout_session = None
 
                 if checkout_session:
 

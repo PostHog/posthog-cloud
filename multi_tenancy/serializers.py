@@ -16,6 +16,9 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
             return None
 
     def create(self, validated_data):
+        import ipdb
+
+        ipdb.set_trace()
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)
 
