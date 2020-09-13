@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_subscription(
-    email: str, base_url: str, customer_id: str = "", custom_price_id: str = "",
+    email: str, base_url: str, price_id: str = "", customer_id: str = "",
 ) -> Tuple[str, str]:
 
-    if not settings.STRIPE_API_KEY or not settings.STRIPE_DEFAULT_PRICE_ID:
+    if not settings.STRIPE_API_KEY:
         logger.warning(
             "Cannot process billing setup because env vars are not properly set.",
         )
@@ -30,12 +30,7 @@ def create_subscription(
 
     payload: Dict = {
         "payment_method_types": ["card"],
-        "line_items": [
-            {
-                "price": custom_price_id or settings.STRIPE_DEFAULT_PRICE_ID,
-                "quantity": 1,
-            }
-        ],
+        "line_items": [{"price": price_id, "quantity": 1,}],
         "mode": "subscription",
         "customer": customer_id,
         "success_url": base_url + "billing/welcome?session_id={CHECKOUT_SESSION_ID}",

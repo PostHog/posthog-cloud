@@ -12,9 +12,12 @@ class Plan(models.Model):
     default_should_setup_billing: models.BooleanField = models.BooleanField(
         default=False,
     )
-    price_id: models.CharField = models.CharField(
-        max_length=128, blank=True, default="",
-    )
+    custom_setup_billing_message = models.TextField(blank=True)
+    price_id: models.CharField = models.CharField(max_length=128)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class TeamBilling(models.Model):

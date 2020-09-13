@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 
 from multi_tenancy.models import TeamBilling
+from multi_tenancy.serializers import PlanSerializer
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
 from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
@@ -39,27 +40,36 @@ def user_with_billing(request: HttpRequest):
             team=request.user.team_set.first(),
         )
 
-        if instance.should_setup_billing and not instance.is_billing_active:
+        if instance.plan:
 
-            checkout_session, customer_id = create_subscription(
-                request.user.email,
-                request.build_absolute_uri("/"),
-                instance.stripe_customer_id,
-                instance.price_id,
-            )
+            plan_serializer = PlanSerializer()
+            output = json.loads(response.content)
+            output["billing"] = {
+                "plan": plan_serializer.to_representation(instance=instance.plan),
+            }
 
-            if checkout_session:
-                output = json.loads(response.content)
+            if instance.should_setup_billing and not instance.is_billing_active:
 
-                TeamBilling.objects.filter(pk=instance.pk).update(
-                    stripe_checkout_session=checkout_session,
-                    stripe_customer_id=customer_id,
+                checkout_session, customer_id = create_subscription(
+                    email=request.user.email,
+                    base_url=request.build_absolute_uri("/"),
+                    price_id=instance.plan.price_id,
+                    customer_id=instance.stripe_customer_id,
                 )
-                output["billing"] = {
-                    "should_setup_billing": instance.should_setup_billing,
-                    "stripe_checkout_session": checkout_session,
-                    "subscription_url": f"/billing/setup?session_id={checkout_session}",
-                }
+
+                if checkout_session:
+
+                    TeamBilling.objects.filter(pk=instance.pk).update(
+                        stripe_checkout_session=checkout_session,
+                        stripe_customer_id=customer_id,
+                    )
+
+                    output["billing"] = {
+                        **output["billing"],
+                        "should_setup_billing": instance.should_setup_billing,
+                        "stripe_checkout_session": checkout_session,
+                        "subscription_url": f"/billing/setup?session_id={checkout_session}",
+                    }
 
                 response = JsonResponse(output)
 

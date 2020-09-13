@@ -126,7 +126,12 @@ class TestTeamSignup(TransactionBaseTest):
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_team_signup_messaging.delay")
     def test_user_can_sign_up_with_a_custom_plan(self, mock_messaging, mock_capture):
-        plan = Plan.objects.create(key="startup", default_should_setup_billing=True)
+        plan = Plan.objects.create(
+            key="startup",
+            default_should_setup_billing=True,
+            price_id="price_12345678",
+            name="Test Plan",
+        )
 
         response = self.client.post(
             "/api/team/signup/",

@@ -3,15 +3,30 @@ import random
 from typing import Dict
 
 import pytz
-from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
 from rest_framework import status
 
 from multi_tenancy.models import Plan, TeamBilling
 from multi_tenancy.stripe import compute_webhook_signature
-from posthog.api.test.base import TransactionBaseTest
+from posthog.api.test.base import BaseTest, TransactionBaseTest
 from posthog.models import Team, User
+
+
+class TestPlan(BaseTest):
+    def test_cannot_create_plan_without_required_attributes(self):
+        with self.assertRaises(ValidationError) as e:
+            Plan.objects.create()
+
+        self.assertEqual(
+            e.exception.message_dict,
+            {
+                "key": ["This field cannot be blank."],
+                "name": ["This field cannot be blank."],
+                "price_id": ["This field cannot be blank."],
+            },
+        )
 
 
 class TestTeamBilling(TransactionBaseTest):
@@ -27,6 +42,14 @@ class TestTeamBilling(TransactionBaseTest):
         team.save()
         return (team, user)
 
+    def create_plan(self, **kwargs):
+        return Plan.objects.create(
+            key=f"plan_{random.randint(100000, 999999)}",
+            price_id=f"price_{random.randint(1000000, 9999999)}",
+            name="Test Plan",
+            **kwargs,
+        )
+
     # Setting up billing
 
     def test_team_should_not_set_up_billing_by_default(self):
@@ -38,7 +61,7 @@ class TestTeamBilling(TransactionBaseTest):
         response_data: Dict = response.json()
         self.assertNotIn(
             "billing", response_data,
-        )  # key should not be present if should_setup_billing = `False`
+        )  # key should not be present if plan = `None`
 
         # TeamBilling object should've been created if non-existent
         self.assertEqual(TeamBilling.objects.count(), count + 1)
@@ -60,67 +83,29 @@ class TestTeamBilling(TransactionBaseTest):
         response_data: Dict = response.json()
         self.assertNotIn(
             "billing", response_data,
-        )  # key should not be present if should_setup_billing = `False`
+        )  # key should not be present if plan = `None`
 
     def test_team_that_should_set_up_billing_starts_a_checkout_session(self):
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True,
-        )
-        self.client.force_login(user)
-
-        with self.assertLogs("multi_tenancy.stripe") as l:
-
-            response = self.client.post("/api/user/")
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-            self.assertIn(
-                "cus_000111222", l.output[0],
-            )  # customer ID is included in the payload to Stripe
-
-            self.assertIn(
-                settings.STRIPE_DEFAULT_PRICE_ID, l.output[0],
-            )  # Default price is used
-
-        response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
-        self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
-        )
-        self.assertEqual(
-            response_data["billing"]["subscription_url"],
-            "/billing/setup?session_id=cs_1234567890",
-        )
-
-        # Check that the checkout session was saved to the database
-        instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session,
-            response_data["billing"]["stripe_checkout_session"],
-        )
-        self.assertEqual(instance.stripe_customer_id, "cus_000111222")
-
-    def test_team_with_custom_pricing(self):
-        """
-        Team has a `custom_price_id` and therefore is billed differently.
-        """
-
-        plan = Plan.objects.create(key="growth", price_id="price_custom_123")
-        team, user = self.create_team_and_user()
+        plan = self.create_plan()
         instance: TeamBilling = TeamBilling.objects.create(
             team=team, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
 
-        with self.assertLogs("multi_tenancy.stripe") as l:
+        with self.assertLogs("multi_tenancy.stripe") as log:
 
             response = self.client.post("/api/user/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
             self.assertIn(
-                "price_custom_123", l.output[0],
-            )  # Custom price ID is used
+                "cus_000111222", log.output[0],
+            )  # customer ID is included in the payload to Stripe
+
+            self.assertIn(
+                plan.price_id, log.output[0],
+            )  # Correct price ID is used
 
         response_data: Dict = response.json()
         self.assertEqual(response_data["billing"]["should_setup_billing"], True)
@@ -160,37 +145,23 @@ class TestTeamBilling(TransactionBaseTest):
 
         team, user = self.create_team_and_user()
         instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True
+            team=team, should_setup_billing=True, plan=self.create_plan(),
         )
         self.client.force_login(user)
 
-        with self.settings(STRIPE_DEFAULT_PRICE_ID=""):
-
-            with self.assertLogs("multi_tenancy.stripe") as l:
-                response_data: Dict = self.client.post("/api/user/").json()
-                self.assertEqual(
-                    l.output[0],
-                    "WARNING:multi_tenancy.stripe:Cannot process billing setup because env vars are not properly set.",
-                )
-
-            self.assertNotIn(
-                "billing", response_data
-            )  # even if `should_setup_billing=True`
-            instance.refresh_from_db()
-            self.assertEqual(instance.stripe_checkout_session, "")
-
         with self.settings(STRIPE_API_KEY=""):
 
-            with self.assertLogs("multi_tenancy.stripe") as l:
+            with self.assertLogs("multi_tenancy.stripe") as log:
                 response_data: Dict = self.client.post("/api/user/").json()
                 self.assertEqual(
-                    l.output[0],
+                    log.output[0],
                     "WARNING:multi_tenancy.stripe:Cannot process billing setup because env vars are not properly set.",
                 )
 
             self.assertNotIn(
-                "billing", response_data
-            )  # even if `should_setup_billing=True`
+                "should_setup_billing", response_data["billing"],
+            )
+
             instance.refresh_from_db()
             self.assertEqual(instance.stripe_checkout_session, "")
 
@@ -199,7 +170,7 @@ class TestTeamBilling(TransactionBaseTest):
     def test_user_can_manage_billing(self):
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        TeamBilling.objects.create(
             team=team, should_setup_billing=True, stripe_customer_id="cus_12345678",
         )
         self.client.force_login(user)
@@ -217,8 +188,8 @@ class TestTeamBilling(TransactionBaseTest):
     def test_user_with_no_billing_set_up_cannot_manage_it(self):
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True
+        TeamBilling.objects.create(
+            team=team, should_setup_billing=True,
         )
         self.client.force_login(user)
 
@@ -229,11 +200,11 @@ class TestTeamBilling(TransactionBaseTest):
     # Stripe webhooks
 
     def generate_webhook_signature(
-        self, payload: str, secret: str, timestamp: datetime.datetime = timezone.now()
+        self, payload: str, secret: str, timestamp: datetime.datetime = timezone.now(),
     ) -> str:
         timestamp: int = int(timestamp.timestamp())
         signature: str = compute_webhook_signature(
-            "%d.%s" % (timestamp, payload), secret
+            "%d.%s" % (timestamp, payload), secret,
         )
         return f"t={timestamp},v1={signature}"
 

@@ -29,3 +29,9 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
             )
 
         return user
+
+
+class PlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plan
+        fields = ["key", "name", "custom_setup_billing_message"]
