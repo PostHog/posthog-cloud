@@ -71,7 +71,7 @@ def user_with_billing(request: HttpRequest):
                         "subscription_url": f"/billing/setup?session_id={checkout_session}",
                     }
 
-                response = JsonResponse(output)
+            response = JsonResponse(output)
 
     return response
 

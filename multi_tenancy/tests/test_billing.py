@@ -88,7 +88,7 @@ class TestTeamBilling(TransactionBaseTest):
     def test_team_that_should_set_up_billing_starts_a_checkout_session(self):
 
         team, user = self.create_team_and_user()
-        plan = self.create_plan()
+        plan = self.create_plan(custom_setup_billing_message="Sign up now!")
         instance: TeamBilling = TeamBilling.objects.create(
             team=team, should_setup_billing=True, plan=plan,
         )
@@ -117,6 +117,15 @@ class TestTeamBilling(TransactionBaseTest):
             "/billing/setup?session_id=cs_1234567890",
         )
 
+        self.assertEqual(
+            response_data["billing"]["plan"],
+            {
+                "key": plan.key,
+                "name": plan.name,
+                "custom_setup_billing_message": "Sign up now!",
+            },
+        )
+
         # Check that the checkout session was saved to the database
         instance.refresh_from_db()
         self.assertEqual(
@@ -127,9 +136,11 @@ class TestTeamBilling(TransactionBaseTest):
 
     def test_cannot_start_double_billing_subscription(self):
         team, user = self.create_team_and_user()
+        plan = self.create_plan()
         instance: TeamBilling = TeamBilling.objects.create(
             team=team,
             should_setup_billing=True,
+            plan=plan,
             billing_period_ends=timezone.now()
             + datetime.timedelta(minutes=random.randint(10, 99)),
         )
@@ -139,7 +150,17 @@ class TestTeamBilling(TransactionBaseTest):
         self.assertEqual(instance.is_billing_active, True)
 
         response_data = self.client.post("/api/user/").json()
-        self.assertNotIn("billing", response_data)
+
+        self.assertEqual(
+            response_data["billing"],
+            {
+                "plan": {
+                    "key": plan.key,
+                    "name": plan.name,
+                    "custom_setup_billing_message": "",
+                },
+            },
+        )
 
     def test_warning_is_logged_if_stripe_variables_are_not_properly_configured(self):
 
