@@ -1,7 +1,7 @@
 import datetime
 import random
 from typing import Dict
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytz
 from django.core.exceptions import ValidationError
@@ -45,10 +45,12 @@ class TestTeamBilling(TransactionBaseTest):
 
     def create_plan(self, **kwargs):
         return Plan.objects.create(
-            key=f"plan_{random.randint(100000, 999999)}",
-            price_id=f"price_{random.randint(1000000, 9999999)}",
-            name="Test Plan",
-            **kwargs,
+            **{
+                "key": f"plan_{random.randint(100000, 999999)}",
+                "price_id": f"price_{random.randint(1000000, 9999999)}",
+                "name": "Test Plan",
+                **kwargs,
+            },
         )
 
     # Setting up billing
@@ -88,7 +90,7 @@ class TestTeamBilling(TransactionBaseTest):
 
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_team_that_should_set_up_billing_starts_a_checkout_session(
-        self, mock_customer_id
+        self, mock_customer_id,
     ):
         mock_customer_id.return_value = "cus_000111222"
         team, user = self.create_team_and_user()
@@ -135,6 +137,74 @@ class TestTeamBilling(TransactionBaseTest):
         self.assertEqual(
             instance.stripe_checkout_session,
             response_data["billing"]["stripe_checkout_session"],
+        )
+        self.assertEqual(instance.stripe_customer_id, "cus_000111222")
+
+    @patch("multi_tenancy.stripe._get_customer_id")
+    @patch("multi_tenancy.stripe.stripe.checkout.Session.create")
+    def test_startup_team_starts_checkout_session(
+        self, mock_checkout, mock_customer_id,
+    ):
+        """
+        Startup handled is handled with custom logic, because only a validation charge is made
+        instead of setting up a full subscription.
+        """
+
+        mock_customer_id.return_value = "cus_000111222"
+        mock_cs_session = MagicMock()
+        mock_cs_session.id = "cs_1234567890"
+
+        mock_checkout.return_value = mock_cs_session
+        team, user = self.create_team_and_user()
+        plan = self.create_plan(key="startup")
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team, should_setup_billing=True, plan=plan,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Assert that Stripe was called with the correct data
+        mock_checkout.assert_called_once_with(
+            customer="cus_000111222",
+            line_items=[
+                {
+                    "amount": 50,
+                    "quantity": 1,
+                    "currency": "USD",
+                    "name": "Card authorization",
+                }
+            ],
+            mode="payment",
+            payment_intent_data={
+                "capture_method": "manual",
+                "statement_descriptor": "POSTHOG PREAUTH",
+            },
+            payment_method_types=["card"],
+            success_url="http://testserver/billing/welcome?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="http://testserver/billing/failed?session_id={CHECKOUT_SESSION_ID}",
+        )
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
+        )
+        self.assertEqual(
+            response_data["billing"]["subscription_url"],
+            "/billing/setup?session_id=cs_1234567890",
+        )
+
+        self.assertEqual(
+            response_data["billing"]["plan"],
+            {"key": "startup", "name": plan.name, "custom_setup_billing_message": "",},
+        )
+
+        # Check that the checkout session was saved to the database
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session, "cs_1234567890",
         )
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
