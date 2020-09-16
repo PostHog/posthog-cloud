@@ -9,18 +9,19 @@ import stripe
 logger = logging.getLogger(__name__)
 
 
-def _get_customer_id(customer_id: str, email: str = ""):
-
+def _init_stripe() -> None:
     if not settings.STRIPE_API_KEY:
         raise ImproperlyConfigured(
-            "Cannot process billing setup because env vars are not properly set.",
+            "Cannot process billing because env vars are not properly set.",
         )
-
-    if customer_id:
-        return customer_id
 
     stripe.api_key = settings.STRIPE_API_KEY
 
+
+def _get_customer_id(customer_id: str, email: str = "") -> str:
+    _init_stripe()
+    if customer_id:
+        return customer_id
     return stripe.Customer.create(email=email).id
 
 
@@ -79,22 +80,18 @@ def create_zero_auth(
     return (session.id, customer_id)
 
 
-def customer_portal_url(customer_id: str) -> Optional[str]:
+def cancel_payment_intent(payment_intent_id: str) -> None:
+    _init_stripe()
+    stripe.PaymentIntent.cancel(payment_intent_id)
 
-    if not settings.STRIPE_API_KEY:
-        logger.warning(
-            "Cannot process billing management because env vars are not properly set."
-        )
-        return None
+
+def customer_portal_url(customer_id: str) -> Optional[str]:
+    _init_stripe()
 
     if settings.TEST:
         return f"/manage-my-billing/{customer_id}"
 
-    stripe.api_key = settings.STRIPE_API_KEY
-
-    session = stripe.billing_portal.Session.create(customer=customer_id,)
-
-    return session.url
+    return stripe.billing_portal.Session.create(customer=customer_id,).url
 
 
 def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:

@@ -400,6 +400,91 @@ class TestTeamBilling(TransactionBaseTest):
             datetime.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
 
+    @patch("multi_tenancy.views.cancel_payment_intent")
+    def test_billing_period_special_handling_for_startup_plan(
+        self, cancel_payment_intent,
+    ):
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+
+        team, user = self.create_team_and_user()
+        team.created_at = datetime.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
+        team.save()
+        startup_plan = Plan.objects.create(
+            key="startup", name="Startup", price_id="not_set",
+        )
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            stripe_customer_id="cus_I2maGIMVxJI",
+            plan=startup_plan,
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id":"evt_h3ETxFuICyJnLbC1H2St7FQu",
+            "object":"event",
+            "created":1594124897,
+            "data":{
+                "object":{
+                    "id":"pi_TxLb1HS1CyhnDR",
+                    "object":"payment_intent",
+                    "status":"requires_capture",
+                    "amount":50,
+                    "amount_capturable":50,
+                    "amount_received":0,
+                    "capture_method":"manual",
+                    "charges":{
+                        "object":"list",
+                        "data":[
+                        {
+                            "id":"ch_1HS204Cyh3ETxLbCkJR5DnKi",
+                            "object":"charge"
+                        }
+                        ],
+                        "has_more":true,
+                        "total_count":2,
+                        "url":"/v1/charges?payment_intent=pi_1HS1wxCyh3ETxLbC5tvUtnDR"
+                    },
+                    "confirmation_method":"automatic",
+                    "created":1600267775,
+                    "currency":"usd",
+                    "customer":"cus_I2maGIMVxJI",
+                    "on_behalf_of":null
+                }
+            },
+            "livemode":false,
+            "pending_webhooks":1,
+            "type":"payment_intent.amount_capturable_updated"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+
+            response = csrf_client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the period end was updated (1 year from account creation)
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.billing_period_ends,
+            datetime.datetime(2020, 12, 31, 0, 0, 0, tzinfo=pytz.UTC),
+        )
+
+        # Check that the payment is cancelled (i.e. not captured)
+        cancel_payment_intent.assert_called_once_with("pi_TxLb1HS1CyhnDR")
+
     @patch("multi_tenancy.views.capture_exception")
     def test_webhook_with_invalid_signature_fails(self, capture_exception):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
@@ -494,7 +579,7 @@ class TestTeamBilling(TransactionBaseTest):
 
         for invalid_payload in [invalid_payload_1, invalid_payload_2]:
             signature: str = self.generate_webhook_signature(
-                invalid_payload, sample_webhook_secret
+                invalid_payload, sample_webhook_secret,
             )
 
             with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
@@ -511,7 +596,8 @@ class TestTeamBilling(TransactionBaseTest):
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, None)
 
-    def test_webhook_where_customer_cannot_be_located_is_logged(self):
+    @patch("multi_tenancy.views.capture_message")
+    def test_webhook_where_customer_cannot_be_located_is_logged(self, capture_message):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         body: str = """
@@ -541,16 +627,14 @@ class TestTeamBilling(TransactionBaseTest):
         signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = self.client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
 
-            with self.assertLogs(logger="multi_tenancy.views") as l:
-                response = self.client.post(
-                    "/billing/stripe_webhook",
-                    body,
-                    content_type="text/plain",
-                    HTTP_STRIPE_SIGNATURE=signature,
-                )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                self.assertIn(
-                    "Received invoice.payment_succeeded for cus_12345678 but customer is not in the database.",
-                    l.output[0],
-                )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        capture_message.assert_called_once_with(
+            "Received invoice.payment_succeeded for cus_12345678 but customer is not in the database.",
+        )
