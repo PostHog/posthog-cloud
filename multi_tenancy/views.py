@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from sentry_sdk import capture_exception, capture_message
@@ -57,29 +58,42 @@ def user_with_billing(request: HttpRequest):
 
             if instance.should_setup_billing and not instance.is_billing_active:
 
-                try:
-                    (
-                        checkout_session,
-                        customer_id,
-                    ) = instance.plan.create_checkout_session(
-                        user=request.user,
-                        team_billing=instance,
-                        base_url=request.build_absolute_uri("/"),
-                    )
-                except ImproperlyConfigured as e:
-                    capture_exception(e)
-                    checkout_session = None
+                if (
+                    instance.stripe_checkout_session
+                    and instance.checkout_session_created_at
+                    and instance.checkout_session_created_at
+                    + datetime.timedelta(minutes=1439)
+                    > timezone.now()
+                ):
+                    # Checkout session has been created and is still active (i.e. created less than 24 hours ago)
+                    checkout_session = instance.stripe_checkout_session
+                else:
+
+                    try:
+                        (
+                            checkout_session,
+                            customer_id,
+                        ) = instance.plan.create_checkout_session(
+                            user=request.user,
+                            team_billing=instance,
+                            base_url=request.build_absolute_uri("/"),
+                        )
+                    except ImproperlyConfigured as e:
+                        capture_exception(e)
+                        checkout_session = None
+
+                    if checkout_session:
+
+                        TeamBilling.objects.filter(pk=instance.pk).update(
+                            stripe_checkout_session=checkout_session,
+                            stripe_customer_id=customer_id,
+                            checkout_session_created_at=timezone.now(),
+                        )
 
                 if checkout_session:
-
-                    TeamBilling.objects.filter(pk=instance.pk).update(
-                        stripe_checkout_session=checkout_session,
-                        stripe_customer_id=customer_id,
-                    )
-
                     output["billing"] = {
                         **output["billing"],
-                        "should_setup_billing": instance.should_setup_billing,
+                        "should_setup_billing": True,
                         "stripe_checkout_session": checkout_session,
                         "subscription_url": f"/billing/setup?session_id={checkout_session}",
                     }
@@ -155,7 +169,6 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         return error_response
 
     try:
-
         customer_id = event["data"]["object"]["customer"]
 
         try:
@@ -184,7 +197,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
 
         # Special handling for plans that only do card validation (e.g. startup);
         # default behavior is setting the plan for 1 year from registration.
-        if event["type"] == "payment_intent.amount_capturable_updated":
+        elif event["type"] == "payment_intent.amount_capturable_updated":
             instance.billing_period_ends = (
                 instance.team.created_at + datetime.timedelta(days=365)
             )

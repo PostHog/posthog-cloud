@@ -208,6 +208,78 @@ class TestTeamBilling(TransactionBaseTest):
         )
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_already_active_checkout_session_uses_same_session(
+        self, mock_customer_id,
+    ):
+        team, user = self.create_team_and_user()
+        plan = self.create_plan()
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            plan=plan,
+            stripe_checkout_session="cs_987654321",
+            checkout_session_created_at=timezone.now() - datetime.timedelta(hours=23),
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"],
+            "cs_987654321",  # <- same session
+        )
+        mock_customer_id.assert_not_called()  # Stripe is not called
+        self.assertEqual(
+            response_data["billing"]["subscription_url"],
+            "/billing/setup?session_id=cs_987654321",
+        )
+
+        # Check that the checkout session does not change
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session,
+            response_data["billing"]["stripe_checkout_session"],
+        )
+
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_expired_checkout_session_generates_a_new_one(
+        self, mock_customer_id,
+    ):
+        mock_customer_id.return_value = "cus_000111222"
+        team, user = self.create_team_and_user()
+        plan = self.create_plan()
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            plan=plan,
+            stripe_checkout_session="cs_ABCDEFGHIJ",
+            checkout_session_created_at=timezone.now()
+            - datetime.timedelta(hours=24, minutes=2),
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"],
+            "cs_1234567890",  # <- note the different session
+        )
+        mock_customer_id.assert_called_once()
+
+        # Assert that the new checkout session was saved to the database
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session,
+            response_data["billing"]["stripe_checkout_session"],
+        )
+
     def test_cannot_start_double_billing_subscription(self):
         team, user = self.create_team_and_user()
         plan = self.create_plan()

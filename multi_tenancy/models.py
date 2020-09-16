@@ -53,6 +53,9 @@ class TeamBilling(models.Model):
     stripe_checkout_session: models.CharField = models.CharField(
         max_length=128, blank=True,
     )
+    checkout_session_created_at: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, default=None,
+    )
     should_setup_billing: models.BooleanField = models.BooleanField(default=False)
     billing_period_ends: models.DateTimeField = models.DateTimeField(
         null=True, blank=True, default=None,
