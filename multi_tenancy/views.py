@@ -125,46 +125,45 @@ def billing_hosted_view(request: HttpRequest):
 def stripe_webhook(request: HttpRequest) -> JsonResponse:
     response: JsonResponse = JsonResponse({"success": True}, status=status.HTTP_200_OK)
     error_response: JsonResponse = JsonResponse(
-        {"success": False}, status=status.HTTP_400_BAD_REQUEST
+        {"success": False}, status=status.HTTP_400_BAD_REQUEST,
     )
     signature: str = request.META.get("HTTP_STRIPE_SIGNATURE", "")
-    event: Dict = parse_webhook(request.read(), signature)
 
-    if event:
-        # Event is correctly formed and signature is valid
+    try:
+        event: Dict = parse_webhook(request.read(), signature)
+    except Exception as e:
+        capture_exception(e)
+        return error_response
 
-        try:
+    try:
 
-            if event["type"] == "invoice.payment_succeeded":
-                customer_id = event["data"]["object"]["customer"]
+        if event["type"] == "invoice.payment_succeeded":
+            customer_id = event["data"]["object"]["customer"]
 
-                try:
-                    instance = TeamBilling.objects.get(stripe_customer_id=customer_id)
-                except TeamBilling.DoesNotExist:
-                    logger.warning(
-                        f"Received invoice.payment_succeeded for {customer_id} but customer is not in the database."
-                    )
-                    return response
+            try:
+                instance = TeamBilling.objects.get(stripe_customer_id=customer_id)
+            except TeamBilling.DoesNotExist:
+                logger.warning(
+                    f"Received invoice.payment_succeeded for {customer_id} but customer is not in the database."
+                )
+                return response
 
-                # We have to use the period from the invoice line items because on the first month
-                # Stripe sets period_end = period_start because they manage these attributes on an accrual-basis
-                line_items = event["data"]["object"]["lines"]["data"]
-                if len(line_items) > 1:
-                    logger.warning(
-                        f"Stripe's invoice.payment_succeeded webhook contained more than 1 line item ({event}), using the first one."
-                    )
+            # We have to use the period from the invoice line items because on the first month
+            # Stripe sets period_end = period_start because they manage these attributes on an accrual-basis
+            line_items = event["data"]["object"]["lines"]["data"]
+            if len(line_items) > 1:
+                logger.warning(
+                    f"Stripe's invoice.payment_succeeded webhook contained more than 1 line item ({event}), using the first one."
+                )
 
-                instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
-                    line_items[0]["period"]["end"],
-                ).replace(tzinfo=pytz.utc)
+            instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
+                line_items[0]["period"]["end"],
+            ).replace(tzinfo=pytz.utc)
 
-                instance.save()
+            instance.save()
 
-        except KeyError:
-            # Malformed request
-            return error_response
-
-    else:
+    except KeyError:
+        # Malformed request
         return error_response
 
     return response

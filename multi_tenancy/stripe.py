@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -79,7 +79,7 @@ def create_zero_auth(
     return (session.id, customer_id)
 
 
-def customer_portal_url(customer_id: str) -> str:
+def customer_portal_url(customer_id: str) -> Optional[str]:
 
     if not settings.STRIPE_API_KEY:
         logger.warning(
@@ -97,28 +97,16 @@ def customer_portal_url(customer_id: str) -> str:
     return session.url
 
 
-def parse_webhook(payload: str, signature: str) -> Dict:
+def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:
 
     if not settings.STRIPE_WEBHOOK_SECRET:
-        logger.error(
-            "Cannot process Stripe webhook because env vars are not properly set."
+        raise ImproperlyConfigured(
+            "Cannot process billing webhook because env vars are not properly set.",
         )
-        return None
 
-    event = None
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, signature, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError:
-        logger.info(f"Error parsing webhook, unexpected payload. Ignoring. {payload}",)
-        return None
-    except stripe.error.SignatureVerificationError:
-        logger.warning(
-            f"Ignoring webhook because signature ({signature}) did not match. {payload}",
-        )
-        return None
-    return event
+    return stripe.Webhook.construct_event(
+        payload, signature, settings.STRIPE_WEBHOOK_SECRET,
+    )
 
 
 def compute_webhook_signature(payload: str, secret: str) -> str:

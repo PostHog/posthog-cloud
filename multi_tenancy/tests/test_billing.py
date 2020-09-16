@@ -292,13 +292,14 @@ class TestTeamBilling(TransactionBaseTest):
     # Stripe webhooks
 
     def generate_webhook_signature(
-        self, payload: str, secret: str, timestamp: datetime.datetime = timezone.now(),
+        self, payload: str, secret: str, timestamp: datetime.datetime = None,
     ) -> str:
-        timestamp: int = int(timestamp.timestamp())
+        timestamp = timezone.now() if not timestamp else timestamp
+        computed_timestamp: int = int(timestamp.timestamp())
         signature: str = compute_webhook_signature(
-            "%d.%s" % (timestamp, payload), secret,
+            "%d.%s" % (computed_timestamp, payload), secret,
         )
-        return f"t={timestamp},v1={signature}"
+        return f"t={computed_timestamp},v1={signature}"
 
     def test_billing_period_is_updated_when_webhook_is_received(self):
 
@@ -399,7 +400,8 @@ class TestTeamBilling(TransactionBaseTest):
             datetime.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
 
-    def test_webhook_with_invalid_signature_fails(self):
+    @patch("multi_tenancy.views.capture_exception")
+    def test_webhook_with_invalid_signature_fails(self, capture_exception):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         team, user = self.create_team_and_user()
@@ -439,15 +441,15 @@ class TestTeamBilling(TransactionBaseTest):
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
 
-            with self.assertLogs(logger="multi_tenancy.stripe") as l:
-                response = self.client.post(
-                    "/billing/stripe_webhook",
-                    body,
-                    content_type="text/plain",
-                    HTTP_STRIPE_SIGNATURE=signature,
-                )
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertIn("Ignoring webhook because signature", l.output[0])
+            response = self.client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        capture_exception.assert_called_once()
 
         # Check that the period end & price ID was NOT updated
         instance.refresh_from_db()
