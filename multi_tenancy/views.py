@@ -115,7 +115,21 @@ def stripe_billing_portal(request: HttpRequest):
 
 
 def billing_welcome_view(request: HttpRequest):
-    return render_template("billing-welcome.html", request)
+    session_id = request.GET.get("session_id")
+    extra_args: Dict = {}
+
+    if session_id:
+        try:
+            team_billing = TeamBilling.objects.get(stripe_checkout_session=session_id)
+        except TeamBilling.DoesNotExist:
+            pass
+
+        if team_billing:
+            serializer = PlanSerializer()
+            extra_args["plan"] = serializer.to_representation(team_billing.plan)
+            extra_args["billing_period_ends"] = team_billing.billing_period_ends
+
+    return render_template("billing-welcome.html", request, extra_args)
 
 
 def billing_failed_view(request: HttpRequest):
