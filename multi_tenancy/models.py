@@ -4,7 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from multi_tenancy.stripe import create_subscription, create_zero_auth
-from posthog.models import Team, User
+from posthog.models import Team
 
 
 class Plan(models.Model):
@@ -15,7 +15,7 @@ class Plan(models.Model):
     default_should_setup_billing: models.BooleanField = models.BooleanField(
         default=False,
     )
-    custom_setup_billing_message = models.TextField(blank=True)
+    custom_setup_billing_message: models.TextField = models.TextField(blank=True)
     price_id: models.CharField = models.CharField(max_length=128)
 
     def save(self, *args, **kwargs):
@@ -23,7 +23,7 @@ class Plan(models.Model):
         return super().save(*args, **kwargs)
 
     def create_checkout_session(
-        self, user: User, team_billing, base_url: str,
+        self, user, team_billing, base_url: str,
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Creates a checkout session for the specified plan.
