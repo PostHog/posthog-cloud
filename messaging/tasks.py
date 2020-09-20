@@ -1,14 +1,14 @@
+import posthoganalytics
 from celery import shared_task
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.utils import timezone
 from django.db import transaction
+from django.utils import timezone
 
 from posthog.models import Team, User
-from .models import UserMessagingRecord
 
 from .mail import Mail
-import posthoganalytics
+from .models import UserMessagingRecord
 
 
 @shared_task
@@ -34,7 +34,7 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int, team_id: int) -> N
         return
 
     record, created = UserMessagingRecord.objects.get_or_create(
-        user=user, campaign=campaign
+        user=user, campaign=campaign,
     )
 
     with transaction.atomic():
@@ -49,7 +49,9 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int, team_id: int) -> N
         record.sent_at = timezone.now()
         record.save()
 
-    posthoganalytics.capture(user.distinct_id, f"sent campaign {campaign}", properties={"medium": "email"})
+    posthoganalytics.capture(
+        user.distinct_id, f"sent campaign {campaign}", properties={"medium": "email"},
+    )
 
 
 @shared_task
@@ -57,5 +59,5 @@ def process_team_signup_messaging(user_id: int, team_id: int) -> None:
     """Process messaging of signed-up users."""
     # Send event ingestion follow-up in 24 hours, if no events have been ingested by that time
     check_and_send_no_event_ingestion_follow_up.apply_async(
-        (user_id, team_id), countdown=86_400
+        (user_id, team_id), countdown=86_400,
     )

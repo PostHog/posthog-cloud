@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import BilledOrganization
+from .models import Plan, BilledOrganization
+
 
 
 @admin.register(BilledOrganization)
@@ -11,7 +12,7 @@ class BilledOrganizationAdmin(admin.ModelAdmin):
         "stripe_customer_id",
         "should_setup_billing",
         "billing_period_ends",
-        "price_id",
+        "plan",
     )
 
     def get_queryset(self, request):
@@ -20,3 +21,16 @@ class BilledOrganizationAdmin(admin.ModelAdmin):
 
     def get_organization_name(self, obj):
         return obj.organization.name
+
+
+@admin.register(Plan)
+class PlanAdmin(admin.ModelAdmin):
+    list_display = (
+        "key",
+        "name",
+        "price_id",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.order_by("key")

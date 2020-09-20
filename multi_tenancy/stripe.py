@@ -1,8 +1,10 @@
-from typing import Tuple, Dict
+import logging
+from typing import Dict, Tuple
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
 import stripe
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +13,7 @@ def create_subscription(
     email: str, customer_id: str = "", custom_price_id: str = "",
 ) -> Tuple[str, str]:
 
-    if not settings.STRIPE_API_KEY or not settings.STRIPE_GROWTH_PRICE_ID:
+    if not settings.STRIPE_API_KEY or not settings.STRIPE_DEFAULT_PRICE_ID:
         logger.warning(
             "Cannot process billing setup because env vars are not properly set.",
         )
@@ -31,7 +33,7 @@ def create_subscription(
         "payment_method_types": ["card"],
         "line_items": [
             {
-                "price": custom_price_id or settings.STRIPE_GROWTH_PRICE_ID,
+                "price": custom_price_id or settings.STRIPE_DEFAULT_PRICE_ID,
                 "quantity": 1,
             }
         ],
@@ -96,4 +98,3 @@ def parse_webhook(payload: str, signature: str) -> Dict:
 
 def compute_webhook_signature(payload: str, secret: str) -> str:
     return stripe.webhook.WebhookSignature._compute_signature(payload, secret)
-

@@ -1,8 +1,11 @@
+import datetime
+import json
+import logging
 from typing import Dict
-from posthog.urls import render_template
-from django.http import JsonResponse, HttpResponse, HttpRequest
+
+import pytz
 from django.conf import settings
-from django.contrib.auth import login
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework import exceptions
@@ -10,12 +13,11 @@ from posthog.models import User, Team, Organization
 from posthog.api.user import user
 from multi_tenancy.models import BilledOrganization
 from multi_tenancy.stripe import create_subscription, customer_portal_url, parse_webhook
-from messaging.tasks import process_team_signup_messaging
-import json
-import logging
-import datetime
-import pytz
-import posthoganalytics
+from posthog.api.team import TeamSignupViewset
+from posthog.api.user import user
+from posthog.urls import render_template
+
+from .serializers import MultiTenancyTeamSignupSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,9 @@ def signup_view(request: HttpRequest):
         process_team_signup_messaging.delay(user_id=user.pk, team_id=team.pk)
         return redirect("/")
 
+class MultiTenancyTeamSignupViewset(TeamSignupViewset):
+    serializer_class = MultiTenancyTeamSignupSerializer
+
 
 def user_with_billing(request: HttpRequest):
     """
@@ -87,7 +92,7 @@ def user_with_billing(request: HttpRequest):
         if instance.should_setup_billing and not instance.is_billing_active:
 
             checkout_session, customer_id = create_subscription(
-                request.user.email, instance.stripe_customer_id, instance.price_id,
+                request.user.email, instance.stripe_customer_id, instance.get_price_id(),
             )
 
             if checkout_session:
@@ -180,11 +185,8 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                     )
 
                 instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
-                    line_items[0]["period"]["end"]
+                    line_items[0]["period"]["end"],
                 ).replace(tzinfo=pytz.utc)
-
-                # Update the price_id too.
-                instance.price_id = line_items[0]["price"]["id"]
 
                 instance.save()
 

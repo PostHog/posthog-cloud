@@ -15,7 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
@@ -24,7 +24,7 @@ jobs:
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Fetch posthog main repo
         run: bin/pull_main
@@ -47,18 +47,18 @@ jobs:
 
       - name: Check migrations
         env:
-          SECRET_KEY: '6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da' # unsafe - for testing only
-          DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
-          REDIS_URL: 'redis://localhost'
+          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
+          DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
+          REDIS_URL: "redis://localhost"
         run: |
           cd deploy
           python manage.py makemigrations --check --dry-run
 
       - name: Run tests
         env:
-          SECRET_KEY: '6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da' # unsafe - for testing only
-          DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
-          REDIS_URL: 'redis://localhost'
+          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
+          REDIS_URL: "redis://localhost"
         run: |
           source .env.template
           cd deploy
@@ -66,4 +66,4 @@ jobs:
           touch frontend/dist/index.html
           touch frontend/dist/layout.html
           touch frontend/dist/shared_dashboard.html
-          python manage.py test -v 2
+          python manage.py test -v 2 --exclude-tag=skip_on_multitenancy
