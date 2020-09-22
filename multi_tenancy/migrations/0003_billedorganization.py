@@ -5,9 +5,9 @@ import django.db.models.deletion
 
 
 def forwards_func(apps, schema_editor):
-    TeamBilling = apps.get_model("multi_tenancy", "TeamBilling")
     BilledOrganization = apps.get_model("multi_tenancy", "BilledOrganization")
-    for team_billing in TeamBilling.objects.all():
+    BilledOrganization = apps.get_model("multi_tenancy", "BilledOrganization")
+    for team_billing in BilledOrganization.objects.all():
         BilledOrganization.objects.create(
             organization=team_billing.team.organization,
             stripe_customer_id=team_billing.stripe_customer_id,

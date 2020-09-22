@@ -9,7 +9,7 @@ from django.test import Client
 from django.utils import timezone
 from rest_framework import status
 
-from multi_tenancy.models import Plan, TeamBilling
+from multi_tenancy.models import Plan, BilledOrganization
 from multi_tenancy.stripe import compute_webhook_signature
 from posthog.api.test.base import BaseTest, TransactionBaseTest
 from posthog.models import Team, User
@@ -30,7 +30,7 @@ class TestPlan(BaseTest):
         )
 
 
-class TestTeamBilling(TransactionBaseTest):
+class TestBilledOrganization(TransactionBaseTest):
 
     TESTS_API = True
 
@@ -57,7 +57,7 @@ class TestTeamBilling(TransactionBaseTest):
 
     def test_team_should_not_set_up_billing_by_default(self):
 
-        count: int = TeamBilling.objects.count()
+        count: int = BilledOrganization.objects.count()
         response = self.client.post("/api/user/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -66,18 +66,18 @@ class TestTeamBilling(TransactionBaseTest):
             "billing", response_data,
         )  # key should not be present if plan = `None`
 
-        # TeamBilling object should've been created if non-existent
-        self.assertEqual(TeamBilling.objects.count(), count + 1)
-        team_billing: TeamBilling = TeamBilling.objects.get(team=self.team)
+        # BilledOrganization object should've been created if non-existent
+        self.assertEqual(BilledOrganization.objects.count(), count + 1)
+        team_billing: BilledOrganization = BilledOrganization.objects.get(team=self.team)
 
-        # Test default values for TeamBilling
+        # Test default values for BilledOrganization
         self.assertEqual(team_billing.should_setup_billing, False)
         self.assertEqual(team_billing.stripe_customer_id, "")
         self.assertEqual(team_billing.stripe_checkout_session, "")
 
     def test_team_that_should_not_set_up_billing(self):
         team, user = self.create_team_and_user()
-        TeamBilling.objects.create(team=team, should_setup_billing=False)
+        BilledOrganization.objects.create(team=team, should_setup_billing=False)
         self.client.force_login(user)
 
         response = self.client.post("/api/user/")
@@ -95,7 +95,7 @@ class TestTeamBilling(TransactionBaseTest):
         mock_customer_id.return_value = "cus_000111222"
         team, user = self.create_team_and_user()
         plan = self.create_plan(custom_setup_billing_message="Sign up now!")
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
@@ -157,7 +157,7 @@ class TestTeamBilling(TransactionBaseTest):
         mock_checkout.return_value = mock_cs_session
         team, user = self.create_team_and_user()
         plan = self.create_plan(key="startup")
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
@@ -214,7 +214,7 @@ class TestTeamBilling(TransactionBaseTest):
     ):
         team, user = self.create_team_and_user()
         plan = self.create_plan()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             plan=plan,
@@ -252,7 +252,7 @@ class TestTeamBilling(TransactionBaseTest):
         mock_customer_id.return_value = "cus_000111222"
         team, user = self.create_team_and_user()
         plan = self.create_plan()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             plan=plan,
@@ -283,7 +283,7 @@ class TestTeamBilling(TransactionBaseTest):
     def test_cannot_start_double_billing_subscription(self):
         team, user = self.create_team_and_user()
         plan = self.create_plan()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             plan=plan,
@@ -314,7 +314,7 @@ class TestTeamBilling(TransactionBaseTest):
         """
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team, should_setup_billing=True, plan=self.create_plan(),
         )
         self.client.force_login(user)
@@ -334,7 +334,7 @@ class TestTeamBilling(TransactionBaseTest):
     def test_user_can_manage_billing(self):
 
         team, user = self.create_team_and_user()
-        TeamBilling.objects.create(
+        BilledOrganization.objects.create(
             team=team, should_setup_billing=True, stripe_customer_id="cus_12345678",
         )
         self.client.force_login(user)
@@ -352,7 +352,7 @@ class TestTeamBilling(TransactionBaseTest):
     def test_user_with_no_billing_set_up_cannot_manage_it(self):
 
         team, user = self.create_team_and_user()
-        TeamBilling.objects.create(
+        BilledOrganization.objects.create(
             team=team, should_setup_billing=True,
         )
         self.client.force_login(user)
@@ -378,7 +378,7 @@ class TestTeamBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             stripe_customer_id="cus_aEDNOHbSpxHcmq",
@@ -485,7 +485,7 @@ class TestTeamBilling(TransactionBaseTest):
         startup_plan = Plan.objects.create(
             key="startup", name="Startup", price_id="not_set",
         )
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             stripe_customer_id="cus_I2maGIMVxJI",
@@ -562,7 +562,7 @@ class TestTeamBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             stripe_customer_id="cus_bEDNOHbSpxHcmq",
@@ -617,7 +617,7 @@ class TestTeamBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        instance: BilledOrganization = BilledOrganization.objects.create(
             team=team,
             should_setup_billing=True,
             stripe_customer_id="cus_dEDNOHbSpxHcmq",
