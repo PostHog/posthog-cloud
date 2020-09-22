@@ -5,4 +5,4 @@ env
 .DS_Store
 .vscode/*
 .idea/
-.mypy_cache
+.mypy_cache/

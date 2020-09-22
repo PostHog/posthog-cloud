@@ -6,14 +6,21 @@
       <span
         ><img
           alt=""
-          src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0Y5QkQyQiIgd2lkdGg9IjE0MHB4IiBoZWlnaHQ9IjE0MHB4Ij4KICAgICAgICAgIDxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9Im5vbmUiIC8+CiAgICAgICAgICA8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptLTIgMTVsLTUtNSAxLjQxLTEuNDFMMTAgMTQuMTdsNy41OS03LjU5TDE5IDhsLTkgOXoiLz4KPC9zdmc+"
+          src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzdBQzk1RSIgd2lkdGg9IjE0MHB4IiBoZWlnaHQ9IjE0MHB4Ij4KICAgICAgICAgIDxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9Im5vbmUiIC8+CiAgICAgICAgICA8cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptLTIgMTVsLTUtNSAxLjQxLTEuNDFMMTAgMTQuMTdsNy41OS03LjU5TDE5IDhsLTkgOXoiLz4KPC9zdmc+"
       /></span>
-      <h1>Welcome to the PostHog <b>Growth Plan</b>!</h1>
+      <h1>You're all set!</h1>
+      {% if plan %}
       <h3>
-        You can now capture up to <b>500,000 events / month</b> to get better
-        insights into your users.
+        You are now subscribed to the <b>{{plan.name}}</b>. Please reach out to
+        <a
+          href="mailto:hey@posthog.com?subject=Billing%20enquiry"
+          rel="noopener"
+          >hey@posthog.com</a
+        >
+        if you have any billing questions.
       </h3>
-      <a class="btn btn-lg btn-primary" style="margin-top: 32px;" href="/">
+      {% endif %}
+      <a class="btn btn-lg btn-primary" style="margin-top: 32px" href="/">
         Continue to PostHog
       </a>
     </div>

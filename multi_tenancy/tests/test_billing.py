@@ -1,16 +1,33 @@
 import datetime
 import random
 from typing import Dict
+from unittest.mock import MagicMock, patch
 
 import pytz
-from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.test import Client
 from django.utils import timezone
 from rest_framework import status
 
 from multi_tenancy.models import Plan, TeamBilling
 from multi_tenancy.stripe import compute_webhook_signature
-from posthog.api.test.base import TransactionBaseTest
+from posthog.api.test.base import BaseTest, TransactionBaseTest
 from posthog.models import Team, User
+
+
+class TestPlan(BaseTest):
+    def test_cannot_create_plan_without_required_attributes(self):
+        with self.assertRaises(ValidationError) as e:
+            Plan.objects.create()
+
+        self.assertEqual(
+            e.exception.message_dict,
+            {
+                "key": ["This field cannot be blank."],
+                "name": ["This field cannot be blank."],
+                "price_id": ["This field cannot be blank."],
+            },
+        )
 
 
 class TestTeamBilling(TransactionBaseTest):
@@ -26,6 +43,16 @@ class TestTeamBilling(TransactionBaseTest):
         team.save()
         return (team, user)
 
+    def create_plan(self, **kwargs):
+        return Plan.objects.create(
+            **{
+                "key": f"plan_{random.randint(100000, 999999)}",
+                "price_id": f"price_{random.randint(1000000, 9999999)}",
+                "name": "Test Plan",
+                **kwargs,
+            },
+        )
+
     # Setting up billing
 
     def test_team_should_not_set_up_billing_by_default(self):
@@ -37,7 +64,7 @@ class TestTeamBilling(TransactionBaseTest):
         response_data: Dict = response.json()
         self.assertNotIn(
             "billing", response_data,
-        )  # key should not be present if should_setup_billing = `False`
+        )  # key should not be present if plan = `None`
 
         # TeamBilling object should've been created if non-existent
         self.assertEqual(TeamBilling.objects.count(), count + 1)
@@ -59,67 +86,32 @@ class TestTeamBilling(TransactionBaseTest):
         response_data: Dict = response.json()
         self.assertNotIn(
             "billing", response_data,
-        )  # key should not be present if should_setup_billing = `False`
+        )  # key should not be present if plan = `None`
 
-    def test_team_that_should_set_up_billing_gets_an_started_checkout_session(self):
-
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_team_that_should_set_up_billing_starts_a_checkout_session(
+        self, mock_customer_id,
+    ):
+        mock_customer_id.return_value = "cus_000111222"
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True,
-        )
-        self.client.force_login(user)
-
-        with self.assertLogs("multi_tenancy.stripe") as l:
-
-            response = self.client.post("/api/user/")
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-            self.assertIn(
-                "cus_000111222", l.output[0],
-            )  # customer ID is included in the payload to Stripe
-
-            self.assertIn(
-                settings.STRIPE_DEFAULT_PRICE_ID, l.output[0],
-            )  # Default price is used
-
-        response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
-        self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
-        )
-        self.assertEqual(
-            response_data["billing"]["subscription_url"],
-            "/billing/setup?session_id=cs_1234567890",
-        )
-
-        # Check that the checkout session was saved to the database
-        instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session,
-            response_data["billing"]["stripe_checkout_session"],
-        )
-        self.assertEqual(instance.stripe_customer_id, "cus_000111222")
-
-    def test_team_with_custom_pricing(self):
-        """
-        Team has a `custom_price_id` and therefore is billed differently.
-        """
-
-        plan = Plan.objects.create(key="growth", price_id="price_custom_123")
-        team, user = self.create_team_and_user()
+        plan = self.create_plan(custom_setup_billing_message="Sign up now!")
         instance: TeamBilling = TeamBilling.objects.create(
             team=team, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
 
-        with self.assertLogs("multi_tenancy.stripe") as l:
+        with self.assertLogs("multi_tenancy.stripe") as log:
 
             response = self.client.post("/api/user/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
             self.assertIn(
-                "price_custom_123", l.output[0],
-            )  # Custom price ID is used
+                "cus_000111222", log.output[0],
+            )  # customer ID is included in the payload to Stripe
+
+            self.assertIn(
+                plan.price_id, log.output[0],
+            )  # Correct price ID is used
 
         response_data: Dict = response.json()
         self.assertEqual(response_data["billing"]["should_setup_billing"], True)
@@ -131,6 +123,15 @@ class TestTeamBilling(TransactionBaseTest):
             "/billing/setup?session_id=cs_1234567890",
         )
 
+        self.assertEqual(
+            response_data["billing"]["plan"],
+            {
+                "key": plan.key,
+                "name": plan.name,
+                "custom_setup_billing_message": "Sign up now!",
+            },
+        )
+
         # Check that the checkout session was saved to the database
         instance.refresh_from_db()
         self.assertEqual(
@@ -139,11 +140,153 @@ class TestTeamBilling(TransactionBaseTest):
         )
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
-    def test_cannot_start_double_billing_subscription(self):
+    @patch("multi_tenancy.stripe._get_customer_id")
+    @patch("multi_tenancy.stripe.stripe.checkout.Session.create")
+    def test_startup_team_starts_checkout_session(
+        self, mock_checkout, mock_customer_id,
+    ):
+        """
+        Startup handled is handled with custom logic, because only a validation charge is made
+        instead of setting up a full subscription.
+        """
+
+        mock_customer_id.return_value = "cus_000111222"
+        mock_cs_session = MagicMock()
+        mock_cs_session.id = "cs_1234567890"
+
+        mock_checkout.return_value = mock_cs_session
         team, user = self.create_team_and_user()
+        plan = self.create_plan(key="startup")
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team, should_setup_billing=True, plan=plan,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Assert that Stripe was called with the correct data
+        mock_checkout.assert_called_once_with(
+            customer="cus_000111222",
+            line_items=[
+                {
+                    "amount": 50,
+                    "quantity": 1,
+                    "currency": "USD",
+                    "name": "Card authorization",
+                }
+            ],
+            mode="payment",
+            payment_intent_data={
+                "capture_method": "manual",
+                "statement_descriptor": "POSTHOG PREAUTH",
+            },
+            payment_method_types=["card"],
+            success_url="http://testserver/billing/welcome?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="http://testserver/billing/failed?session_id={CHECKOUT_SESSION_ID}",
+        )
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
+        )
+        self.assertEqual(
+            response_data["billing"]["subscription_url"],
+            "/billing/setup?session_id=cs_1234567890",
+        )
+
+        self.assertEqual(
+            response_data["billing"]["plan"],
+            {"key": "startup", "name": plan.name, "custom_setup_billing_message": "",},
+        )
+
+        # Check that the checkout session was saved to the database
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session, "cs_1234567890",
+        )
+        self.assertEqual(instance.stripe_customer_id, "cus_000111222")
+
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_already_active_checkout_session_uses_same_session(
+        self, mock_customer_id,
+    ):
+        team, user = self.create_team_and_user()
+        plan = self.create_plan()
         instance: TeamBilling = TeamBilling.objects.create(
             team=team,
             should_setup_billing=True,
+            plan=plan,
+            stripe_checkout_session="cs_987654321",
+            checkout_session_created_at=timezone.now() - datetime.timedelta(hours=23),
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"],
+            "cs_987654321",  # <- same session
+        )
+        mock_customer_id.assert_not_called()  # Stripe is not called
+        self.assertEqual(
+            response_data["billing"]["subscription_url"],
+            "/billing/setup?session_id=cs_987654321",
+        )
+
+        # Check that the checkout session does not change
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session,
+            response_data["billing"]["stripe_checkout_session"],
+        )
+
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_expired_checkout_session_generates_a_new_one(
+        self, mock_customer_id,
+    ):
+        mock_customer_id.return_value = "cus_000111222"
+        team, user = self.create_team_and_user()
+        plan = self.create_plan()
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            plan=plan,
+            stripe_checkout_session="cs_ABCDEFGHIJ",
+            checkout_session_created_at=timezone.now()
+            - datetime.timedelta(hours=24, minutes=2),
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_data: Dict = response.json()
+        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(
+            response_data["billing"]["stripe_checkout_session"],
+            "cs_1234567890",  # <- note the different session
+        )
+        mock_customer_id.assert_called_once()
+
+        # Assert that the new checkout session was saved to the database
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.stripe_checkout_session,
+            response_data["billing"]["stripe_checkout_session"],
+        )
+
+    def test_cannot_start_double_billing_subscription(self):
+        team, user = self.create_team_and_user()
+        plan = self.create_plan()
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            plan=plan,
             billing_period_ends=timezone.now()
             + datetime.timedelta(minutes=random.randint(10, 99)),
         )
@@ -153,52 +296,45 @@ class TestTeamBilling(TransactionBaseTest):
         self.assertEqual(instance.is_billing_active, True)
 
         response_data = self.client.post("/api/user/").json()
-        self.assertNotIn("billing", response_data)
 
-    def test_warning_is_logged_if_stripe_variables_are_not_properly_configured(self):
+        self.assertEqual(
+            response_data["billing"],
+            {
+                "plan": {
+                    "key": plan.key,
+                    "name": plan.name,
+                    "custom_setup_billing_message": "",
+                },
+            },
+        )
+
+    def test_silent_fail_if_stripe_variables_are_not_properly_configured(self):
+        """
+        If Stripe variables are not properly set, an exception will be sent to Sentry.
+        """
 
         team, user = self.create_team_and_user()
         instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True
+            team=team, should_setup_billing=True, plan=self.create_plan(),
         )
         self.client.force_login(user)
 
-        with self.settings(STRIPE_DEFAULT_PRICE_ID=""):
-
-            with self.assertLogs("multi_tenancy.stripe") as l:
-                response_data: Dict = self.client.post("/api/user/").json()
-                self.assertEqual(
-                    l.output[0],
-                    "WARNING:multi_tenancy.stripe:Cannot process billing setup because env vars are not properly set.",
-                )
-
-            self.assertNotIn(
-                "billing", response_data
-            )  # even if `should_setup_billing=True`
-            instance.refresh_from_db()
-            self.assertEqual(instance.stripe_checkout_session, "")
-
         with self.settings(STRIPE_API_KEY=""):
+            response_data: Dict = self.client.post("/api/user/").json()
 
-            with self.assertLogs("multi_tenancy.stripe") as l:
-                response_data: Dict = self.client.post("/api/user/").json()
-                self.assertEqual(
-                    l.output[0],
-                    "WARNING:multi_tenancy.stripe:Cannot process billing setup because env vars are not properly set.",
-                )
+        self.assertNotIn(
+            "should_setup_billing", response_data["billing"],
+        )
 
-            self.assertNotIn(
-                "billing", response_data
-            )  # even if `should_setup_billing=True`
-            instance.refresh_from_db()
-            self.assertEqual(instance.stripe_checkout_session, "")
+        instance.refresh_from_db()
+        self.assertEqual(instance.stripe_checkout_session, "")
 
     # Manage billing
 
     def test_user_can_manage_billing(self):
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
+        TeamBilling.objects.create(
             team=team, should_setup_billing=True, stripe_customer_id="cus_12345678",
         )
         self.client.force_login(user)
@@ -216,8 +352,8 @@ class TestTeamBilling(TransactionBaseTest):
     def test_user_with_no_billing_set_up_cannot_manage_it(self):
 
         team, user = self.create_team_and_user()
-        instance: TeamBilling = TeamBilling.objects.create(
-            team=team, should_setup_billing=True
+        TeamBilling.objects.create(
+            team=team, should_setup_billing=True,
         )
         self.client.force_login(user)
 
@@ -228,13 +364,14 @@ class TestTeamBilling(TransactionBaseTest):
     # Stripe webhooks
 
     def generate_webhook_signature(
-        self, payload: str, secret: str, timestamp: datetime.datetime = timezone.now()
+        self, payload: str, secret: str, timestamp: datetime.datetime = None,
     ) -> str:
-        timestamp: int = int(timestamp.timestamp())
+        timestamp = timezone.now() if not timestamp else timestamp
+        computed_timestamp: int = int(timestamp.timestamp())
         signature: str = compute_webhook_signature(
-            "%d.%s" % (timestamp, payload), secret
+            "%d.%s" % (computed_timestamp, payload), secret,
         )
-        return f"t={timestamp},v1={signature}"
+        return f"t={computed_timestamp},v1={signature}"
 
     def test_billing_period_is_updated_when_webhook_is_received(self):
 
@@ -314,10 +451,13 @@ class TestTeamBilling(TransactionBaseTest):
         """
 
         signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
 
-            response = self.client.post(
+            response = csrf_client.post(
                 "/billing/stripe_webhook",
                 body,
                 content_type="text/plain",
@@ -332,7 +472,93 @@ class TestTeamBilling(TransactionBaseTest):
             datetime.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
 
-    def test_webhook_with_invalid_signature_fails(self):
+    @patch("multi_tenancy.views.cancel_payment_intent")
+    def test_billing_period_special_handling_for_startup_plan(
+        self, cancel_payment_intent,
+    ):
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+
+        team, user = self.create_team_and_user()
+        team.created_at = datetime.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
+        team.save()
+        startup_plan = Plan.objects.create(
+            key="startup", name="Startup", price_id="not_set",
+        )
+        instance: TeamBilling = TeamBilling.objects.create(
+            team=team,
+            should_setup_billing=True,
+            stripe_customer_id="cus_I2maGIMVxJI",
+            plan=startup_plan,
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id":"evt_h3ETxFuICyJnLbC1H2St7FQu",
+            "object":"event",
+            "created":1594124897,
+            "data":{
+                "object":{
+                    "id":"pi_TxLb1HS1CyhnDR",
+                    "object":"payment_intent",
+                    "status":"requires_capture",
+                    "amount":50,
+                    "amount_capturable":50,
+                    "amount_received":0,
+                    "capture_method":"manual",
+                    "charges":{
+                        "object":"list",
+                        "data":[
+                        {
+                            "id":"ch_1HS204Cyh3ETxLbCkJR5DnKi",
+                            "object":"charge"
+                        }
+                        ],
+                        "has_more":true,
+                        "total_count":2,
+                        "url":"/v1/charges?payment_intent=pi_1HS1wxCyh3ETxLbC5tvUtnDR"
+                    },
+                    "confirmation_method":"automatic",
+                    "created":1600267775,
+                    "currency":"usd",
+                    "customer":"cus_I2maGIMVxJI",
+                    "on_behalf_of":null
+                }
+            },
+            "livemode":false,
+            "pending_webhooks":1,
+            "type":"payment_intent.amount_capturable_updated"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+
+            response = csrf_client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the period end was updated (1 year from account creation)
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.billing_period_ends,
+            datetime.datetime(2020, 12, 31, 0, 0, 0, tzinfo=pytz.UTC),
+        )
+
+        # Check that the payment is cancelled (i.e. not captured)
+        cancel_payment_intent.assert_called_once_with("pi_TxLb1HS1CyhnDR")
+
+    @patch("multi_tenancy.views.capture_exception")
+    def test_webhook_with_invalid_signature_fails(self, capture_exception):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         team, user = self.create_team_and_user()
@@ -372,15 +598,15 @@ class TestTeamBilling(TransactionBaseTest):
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
 
-            with self.assertLogs(logger="multi_tenancy.stripe") as l:
-                response = self.client.post(
-                    "/billing/stripe_webhook",
-                    body,
-                    content_type="text/plain",
-                    HTTP_STRIPE_SIGNATURE=signature,
-                )
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertIn("Ignoring webhook because signature", l.output[0])
+            response = self.client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        capture_exception.assert_called_once()
 
         # Check that the period end & price ID was NOT updated
         instance.refresh_from_db()
@@ -425,7 +651,7 @@ class TestTeamBilling(TransactionBaseTest):
 
         for invalid_payload in [invalid_payload_1, invalid_payload_2]:
             signature: str = self.generate_webhook_signature(
-                invalid_payload, sample_webhook_secret
+                invalid_payload, sample_webhook_secret,
             )
 
             with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
@@ -442,7 +668,8 @@ class TestTeamBilling(TransactionBaseTest):
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, None)
 
-    def test_webhook_where_customer_cannot_be_located_is_logged(self):
+    @patch("multi_tenancy.views.capture_message")
+    def test_webhook_where_customer_cannot_be_located_is_logged(self, capture_message):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         body: str = """
@@ -472,16 +699,14 @@ class TestTeamBilling(TransactionBaseTest):
         signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = self.client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
 
-            with self.assertLogs(logger="multi_tenancy.views") as l:
-                response = self.client.post(
-                    "/billing/stripe_webhook",
-                    body,
-                    content_type="text/plain",
-                    HTTP_STRIPE_SIGNATURE=signature,
-                )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                self.assertIn(
-                    "Received invoice.payment_succeeded for cus_12345678 but customer is not in the database.",
-                    l.output[0],
-                )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        capture_message.assert_called_once_with(
+            "Received invoice.payment_succeeded for cus_12345678 but customer is not in the database.",
+        )
