@@ -10,7 +10,7 @@ We pull in our main repo using the script into the `/deploy` folder. We then cop
 
 ## Developing locally
 
-> To develop locally with Docker follow the instructions at `https://posthog.com/docs/developing-locally`. Do not forget to load the relevant environment variables and run `bin/develop`. You can also develop relative to a main repo branch different than `master` by passing branch name as command line argument, like so: `bin/develop some-feature`.
+> To develop locally with Docker follow the instructions at `https://posthog.com/docs/developing-locally`. Do not forget to load the relevant environment variables and run `bin/develop`. If you need to develop relative to a main repo branch other than `master`, pass branch name as command line argument, like so: `bin/develop some-branch`.
 
 1. Set up a virtual environment (sample code below).
     ```bash
