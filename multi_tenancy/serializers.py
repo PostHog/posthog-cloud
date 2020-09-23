@@ -23,7 +23,7 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
 
         if plan:
             BilledOrganization.objects.create(
-                team=self._team,
+                organization=self._team.organization,
                 plan=plan,
                 should_setup_billing=plan.default_should_setup_billing,
             )

@@ -46,8 +46,8 @@ class Plan(models.Model):
         )
 
 
-class BilledOrganization(models.Model):
-    """DEPRECATED: Organization is now the root entity, so BilledOrganization has been replaced with BilledOrganization."""
+class TeamBilling(models.Model):
+    """DEPRECATED: Organization is now the root entity, so TeamBilling has been replaced with BilledOrganization."""
 
     team: models.OneToOneField = models.OneToOneField(Team, on_delete=models.CASCADE)
     stripe_customer_id: models.CharField = models.CharField(max_length=128, blank=True)
@@ -64,18 +64,13 @@ class BilledOrganization(models.Model):
     plan: models.ForeignKey = models.ForeignKey(
         Plan, on_delete=models.PROTECT, null=True,
     )
-    price_id: models.CharField = models.CharField(
-        max_length=128, blank=True, default=""
-    )
 
     @property
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
     def get_price_id(self) -> str:
-        if self.plan:
-            return self.plan.price_id
-        return self.price_id or ""
+        return self.plan.price_id if self.plan else ""
 
 
 class BilledOrganization(Organization):
@@ -90,17 +85,17 @@ class BilledOrganization(Organization):
     )
     stripe_customer_id: models.CharField = models.CharField(max_length=128, blank=True)
     stripe_checkout_session: models.CharField = models.CharField(
-        max_length=128, blank=True
+        max_length=128, blank=True,
+    )
+    checkout_session_created_at: models.DateTimeField = models.DateTimeField(
+        null=True, blank=True, default=None,
     )
     should_setup_billing: models.BooleanField = models.BooleanField(default=False)
     billing_period_ends: models.DateTimeField = models.DateTimeField(
-        null=True, blank=True, default=None
+        null=True, blank=True, default=None,
     )
     plan: models.ForeignKey = models.ForeignKey(
         Plan, on_delete=models.PROTECT, null=True,
-    )
-    price_id: models.CharField = models.CharField(
-        max_length=128, blank=True, default=""
     )
 
     @property
@@ -108,6 +103,4 @@ class BilledOrganization(Organization):
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
     def get_price_id(self) -> str:
-        if self.plan:
-            return self.plan.price_id
-        return self.price_id or ""
+        return self.plan.price_id if self.plan else ""

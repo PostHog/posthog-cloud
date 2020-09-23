@@ -133,14 +133,13 @@ def user_with_billing(request: HttpRequest):
                     except ImproperlyConfigured as e:
                         capture_exception(e)
                         checkout_session = None
-
-                    if checkout_session:
-
-                        BilledOrganization.objects.filter(pk=instance.pk).update(
-                            stripe_checkout_session=checkout_session,
-                            stripe_customer_id=customer_id,
-                            checkout_session_created_at=timezone.now(),
-                        )
+                    else:
+                        if checkout_session:
+                            BilledOrganization.objects.filter(pk=instance.pk).update(
+                                stripe_checkout_session=checkout_session,
+                                stripe_customer_id=customer_id,
+                                checkout_session_created_at=timezone.now(),
+                            )
 
                 if checkout_session:
                     output["billing"] = {
@@ -189,8 +188,7 @@ def billing_welcome_view(request: HttpRequest):
             team_billing = BilledOrganization.objects.get(stripe_checkout_session=session_id)
         except BilledOrganization.DoesNotExist:
             pass
-
-        if team_billing:
+        else:
             serializer = PlanSerializer()
             extra_args["plan"] = serializer.to_representation(team_billing.plan)
             extra_args["billing_period_ends"] = team_billing.billing_period_ends
