@@ -68,7 +68,7 @@ class TestBilledOrganization(TransactionBaseTest):
 
         # BilledOrganization object should've been created if non-existent
         self.assertEqual(BilledOrganization.objects.count(), count + 1)
-        team_billing: BilledOrganization = BilledOrganization.objects.get(team=self.team)
+        team_billing: BilledOrganization = BilledOrganization.objects.get(organization=self.organization)
 
         # Test default values for BilledOrganization
         self.assertEqual(team_billing.should_setup_billing, False)
@@ -146,7 +146,7 @@ class TestBilledOrganization(TransactionBaseTest):
         self, mock_checkout, mock_customer_id,
     ):
         """
-        Startup handled is handled with custom logic, because only a validation charge is made
+        Startup is handled with custom logic, because only a validation charge is made
         instead of setting up a full subscription.
         """
 

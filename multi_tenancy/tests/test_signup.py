@@ -4,7 +4,7 @@ from rest_framework import status
 
 from multi_tenancy.models import Plan, BilledOrganization
 from posthog.api.test.base import TransactionBaseTest
-from posthog.models import Team, User
+from posthog.models import Team, User, Organization
 
 
 class TestTeamSignup(TransactionBaseTest):
@@ -37,7 +37,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.team_set.all()[0]
+        team: Team = user.teams.first()
+        organization: Organization = user.organizations.first()
         self.assertEqual(
             response.data,
             {
@@ -81,7 +82,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertTrue(user.check_password("notsecure"))
 
         # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
 
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_team_signup_messaging.delay")
@@ -103,7 +104,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.team_set.all()[0]
+        organization: Organization = user.organizations.first()
 
         # Assert that the user was properly created
         self.assertEqual(user.email, "hedgehog5@posthog.com")
@@ -121,7 +122,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.json()["email"], "hedgehog5@posthog.com")
 
         # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
 
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_team_signup_messaging.delay")
@@ -146,7 +147,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.team_set.all()[0]
+        team: Team = user.teams.first()
+        organization: Organization = user.organizations.first()
 
         self.assertEqual(user.first_name, "John")
         self.assertEqual(user.email, "hedgehog@posthog.com")
@@ -157,7 +159,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(team_billing.should_setup_billing, True)
 
         # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
@@ -182,7 +184,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.team_set.all()[0]
+        team: Team = user.teams.first()
+        organization: Organization = user.organizations.first()
 
         self.assertEqual(user.first_name, "Jane")
         self.assertEqual(user.email, "hedgehog6@posthog.com")
@@ -198,7 +201,7 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
         # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.pk, team_id=team.pk)
+        mock_messaging.assert_called_once_with(user_id=user.pk, organization_id=str(organization.id))
 
     @patch("messaging.tasks.process_team_signup_messaging.delay")
     @patch("posthog.api.team.posthoganalytics.identify")
@@ -261,5 +264,5 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_team_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.pk, team_id=user.team_set.all()[0].pk,
+            user_id=user.pk, organization_id=str(user.organization.id),
         )

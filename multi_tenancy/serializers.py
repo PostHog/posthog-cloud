@@ -19,11 +19,11 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)
 
-        process_team_signup_messaging.delay(user_id=user.pk, team_id=self._team.pk)
+        process_team_signup_messaging.delay(user_id=user.pk, organization_id=str(self._organization.id))
 
         if plan:
             BilledOrganization.objects.create(
-                organization=self._team.organization,
+                organization=self._organization,
                 plan=plan,
                 should_setup_billing=plan.default_should_setup_billing,
             )

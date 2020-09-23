@@ -88,11 +88,11 @@ class BilledOrganization(Organization):
         max_length=128, blank=True,
     )
     checkout_session_created_at: models.DateTimeField = models.DateTimeField(
-        null=True, blank=True, default=None,
+        null=True, blank=True,
     )
     should_setup_billing: models.BooleanField = models.BooleanField(default=False)
     billing_period_ends: models.DateTimeField = models.DateTimeField(
-        null=True, blank=True, default=None,
+        null=True, blank=True,
     )
     plan: models.ForeignKey = models.ForeignKey(
         Plan, on_delete=models.PROTECT, null=True,

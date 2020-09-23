@@ -13,12 +13,9 @@ class TestMessaging(BaseTest):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.team: Team = Team.objects.create()
-        cls.user: User = User.objects.create(
-            email="test@posthog.com", first_name="John Test"
+        cls.organization, cls.team, cls.user = User.objects.bootstrap(
+            company_name="Test", email="test@posthog.com", password=None, first_name="John Test"
         )
-        cls.team.users.add(cls.user)
-        cls.team.save()
 
     def test_cannot_send_the_same_campaign_twice_to_the_same_user(self):
         user: User = User.objects.create(email="valid@posthog.com")
@@ -33,7 +30,7 @@ class TestMessaging(BaseTest):
 
     def test_check_and_send_no_event_ingestion_follow_up(self):
         with self.settings(SITE_URL="https://app.posthog.com"):
-            check_and_send_no_event_ingestion_follow_up(self.user.pk, self.team.pk)
+            check_and_send_no_event_ingestion_follow_up(self.user.pk, self.organization.pk)
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
@@ -53,13 +50,12 @@ class TestMessaging(BaseTest):
 
     def test_does_not_send_event_ingestion_email_if_team_has_ingested_events(self):
         # Object setup
-        team: Team = Team.objects.create()
-        user: User = User.objects.create(email="test3@posthog.com")
-        team.users.add(user)
-        team.save()
+        organization, team, user = User.objects.bootstrap(
+            company_name="Test III", email="test3@posthog.com", password=None, first_name="John Test III"
+        )
         Event.objects.create(team=team)
 
-        check_and_send_no_event_ingestion_follow_up(user.pk, team.pk)
+        check_and_send_no_event_ingestion_follow_up(user.pk, organization.pk)
         self.assertEqual(len(mail.outbox), 0)
 
     def test_does_not_send_event_ingestion_email_on_invalid_address(self):
@@ -67,7 +63,7 @@ class TestMessaging(BaseTest):
         self.team.users.add(user)
         self.team.save()
 
-        check_and_send_no_event_ingestion_follow_up(user.pk, self.team.pk)
+        check_and_send_no_event_ingestion_follow_up(user.pk, self.organization.pk)
         self.assertEqual(len(mail.outbox), 0)
 
     def test_does_not_send_event_ingestion_email_if_user_is_anonymized(self):
@@ -75,7 +71,7 @@ class TestMessaging(BaseTest):
         self.team.users.add(user)
         self.team.save()
 
-        check_and_send_no_event_ingestion_follow_up(user.pk, self.team.pk)
+        check_and_send_no_event_ingestion_follow_up(user.pk, self.organization.pk)
         self.assertEqual(len(mail.outbox), 0)
 
     def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(
@@ -86,7 +82,7 @@ class TestMessaging(BaseTest):
         self.team.save()
 
         for i in range(0, 3):
-            check_and_send_no_event_ingestion_follow_up(user.pk, self.team.pk)
+            check_and_send_no_event_ingestion_follow_up(user.pk, self.organization.pk)
         self.assertEqual(len(mail.outbox), 1)  # just one email was sent
 
     def test_event_ingestion_email_is_sent_again_if_previous_attempt_failed(self,):
@@ -98,5 +94,5 @@ class TestMessaging(BaseTest):
             campaign=UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP,  # sent_at = None (i.e. has not been sent)
         )
 
-        check_and_send_no_event_ingestion_follow_up(user.pk, self.team.pk)
+        check_and_send_no_event_ingestion_follow_up(user.pk, self.organization.pk)
         self.assertEqual(len(mail.outbox), 1)  # email was sent
