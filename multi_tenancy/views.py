@@ -1,7 +1,9 @@
 import datetime
 import json
 import logging
+from messaging.tasks import process_team_signup_messaging
 from typing import Dict
+from django.contrib.auth import login
 
 import pytz
 from django.conf import settings
@@ -15,7 +17,7 @@ from rest_framework import exceptions
 from posthog.models import User, Team, Organization
 from multi_tenancy.models import BilledOrganization
 from sentry_sdk import capture_exception, capture_message
-
+import posthoganalytics
 import stripe
 from multi_tenancy.serializers import PlanSerializer
 from multi_tenancy.stripe import (
