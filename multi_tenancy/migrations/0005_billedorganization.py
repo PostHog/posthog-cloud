@@ -25,8 +25,8 @@ def reverse_func(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("posthog", "0086_auto_20200910_0725"),
-        ("multi_tenancy", "0002_teambilling_price_id"),
+        ("posthog", "0085_org_models"),
+        ("multi_tenancy", "0004_auto_20200920_2021"),
     ]
 
     operations = [
