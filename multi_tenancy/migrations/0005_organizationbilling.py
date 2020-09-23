@@ -5,9 +5,9 @@ import django.db.models.deletion
 
 def forwards_func(apps, schema_editor):
     TeamBilling = apps.get_model("multi_tenancy", "TeamBilling")
-    BilledOrganization = apps.get_model("multi_tenancy", "BilledOrganization")
+    OrganizationBilling = apps.get_model("multi_tenancy", "OrganizationBilling")
     for team_billing in TeamBilling.objects.all():
-        BilledOrganization.objects.create(
+        OrganizationBilling.objects.create(
             organization=team_billing.team.organization,
             stripe_customer_id=team_billing.stripe_customer_id,
             stripe_checkout_session=team_billing.stripe_checkout_session,
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='BilledOrganization',
+            name='OrganizationBilling',
             fields=[
                 ('organization', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, related_name='billing', serialize=False, to='posthog.Organization')),
                 ('stripe_customer_id', models.CharField(blank=True, max_length=128)),

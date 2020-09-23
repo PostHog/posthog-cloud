@@ -3,7 +3,7 @@ from rest_framework import serializers
 from messaging.tasks import process_team_signup_messaging
 from posthog.api.team import TeamSignupSerializer
 
-from .models import Plan, BilledOrganization
+from .models import Plan, OrganizationBilling
 
 
 class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
@@ -22,7 +22,7 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
         process_team_signup_messaging.delay(user_id=user.pk, organization_id=str(self._organization.id))
 
         if plan:
-            BilledOrganization.objects.create(
+            OrganizationBilling.objects.create(
                 organization=self._organization,
                 plan=plan,
                 should_setup_billing=plan.default_should_setup_billing,

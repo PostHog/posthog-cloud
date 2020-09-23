@@ -47,7 +47,7 @@ class Plan(models.Model):
 
 
 class TeamBilling(models.Model):
-    """DEPRECATED: Organization is now the root entity, so TeamBilling has been replaced with BilledOrganization."""
+    """DEPRECATED: Organization is now the root entity, so TeamBilling has been replaced with OrganizationBilling."""
 
     team: models.OneToOneField = models.OneToOneField(Team, on_delete=models.CASCADE)
     stripe_customer_id: models.CharField = models.CharField(max_length=128, blank=True)
@@ -73,7 +73,7 @@ class TeamBilling(models.Model):
         return self.plan.price_id if self.plan else ""
 
 
-class BilledOrganization(Organization):
+class OrganizationBilling(models.Model):
     """An extension to Organization for handling PostHog Cloud billing."""
 
     organization: models.OneToOneField = models.OneToOneField(

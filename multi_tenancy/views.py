@@ -14,7 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework import exceptions
 from posthog.models import User, Team, Organization
-from multi_tenancy.models import BilledOrganization
+from multi_tenancy.models import OrganizationBilling
 from sentry_sdk import capture_exception, capture_message
 import stripe
 from multi_tenancy.serializers import PlanSerializer
@@ -47,7 +47,7 @@ def user_with_billing(request: HttpRequest):
 
     if response.status_code == 200:
         # TODO: Handle multiple organizations
-        instance, created = BilledOrganization.objects.get_or_create(
+        instance, created = OrganizationBilling.objects.get_or_create(
             organization=request.user.organization
         )
 
@@ -86,7 +86,7 @@ def user_with_billing(request: HttpRequest):
                         checkout_session = None
                     else:
                         if checkout_session:
-                            BilledOrganization.objects.filter(pk=instance.pk).update(
+                            OrganizationBilling.objects.filter(pk=instance.pk).update(
                                 stripe_checkout_session=checkout_session,
                                 stripe_customer_id=customer_id,
                                 checkout_session_created_at=timezone.now(),
@@ -118,7 +118,7 @@ def stripe_billing_portal(request: HttpRequest):
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
-    instance, created = BilledOrganization.objects.get_or_create(
+    instance, created = OrganizationBilling.objects.get_or_create(
         organization=request.user.organization
     )
 
@@ -136,8 +136,8 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            team_billing = BilledOrganization.objects.get(stripe_checkout_session=session_id)
-        except BilledOrganization.DoesNotExist:
+            team_billing = OrganizationBilling.objects.get(stripe_checkout_session=session_id)
+        except OrganizationBilling.DoesNotExist:
             pass
         else:
             serializer = PlanSerializer()
@@ -173,8 +173,8 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         customer_id = event["data"]["object"]["customer"]
 
         try:
-            instance = BilledOrganization.objects.get(stripe_customer_id=customer_id)
-        except BilledOrganization.DoesNotExist:
+            instance = OrganizationBilling.objects.get(stripe_customer_id=customer_id)
+        except OrganizationBilling.DoesNotExist:
             capture_message(
                 f"Received invoice.payment_succeeded for {customer_id} but customer is not in the database.",
             )

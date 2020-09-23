@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from rest_framework import status
 
-from multi_tenancy.models import Plan, BilledOrganization
+from multi_tenancy.models import Plan, OrganizationBilling
 from posthog.api.test.base import TransactionBaseTest
 from posthog.models import Team, User, Organization
 
@@ -154,7 +154,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(user.email, "hedgehog@posthog.com")
         self.assertEqual(team.name, "Hedgehogs United, LLC")
 
-        team_billing: BilledOrganization = team.teambilling
+        team_billing: OrganizationBilling = team.teambilling
         self.assertEqual(team_billing.plan, plan)
         self.assertEqual(team_billing.should_setup_billing, True)
 
@@ -190,8 +190,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(user.first_name, "Jane")
         self.assertEqual(user.email, "hedgehog6@posthog.com")
         self.assertFalse(
-            BilledOrganization.objects.filter(team=team).exists(),
-        )  # BilledOrganization is not created yet
+            OrganizationBilling.objects.filter(team=team).exists(),
+        )  # OrganizationBilling is not created yet
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(

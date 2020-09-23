@@ -1,11 +1,11 @@
 from django.contrib import admin
 
-from .models import Plan, BilledOrganization
+from .models import Plan, OrganizationBilling
 
 
 
-@admin.register(BilledOrganization)
-class BilledOrganizationAdmin(admin.ModelAdmin):
+@admin.register(OrganizationBilling)
+class OrganizationBillingAdmin(admin.ModelAdmin):
     readonly_fields = ("stripe_checkout_session",)
     list_display = (
         "get_organization_name",

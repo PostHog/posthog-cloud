@@ -10,9 +10,8 @@ from posthog.models import Event, Team, User
 
 
 class TestMessaging(BaseTest):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def setUp(cls):
+        super().setUp()
         cls.organization, cls.team, cls.user = User.objects.bootstrap(
             company_name="Test", email="test@posthog.com", password=None, first_name="John Test"
         )
