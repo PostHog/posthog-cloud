@@ -14,30 +14,25 @@ from .models import UserMessagingRecord
 @shared_task
 def check_and_send_no_event_ingestion_follow_up(user_id: int, organization_id: str) -> None:
     """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
-    print('\nTest started:')
     campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
 
     user: User = User.objects.get(id=user_id)
     organization: Organization = Organization.objects.get(id=organization_id)
 
-    print('aaaaaaaaaaaaa')
     # If user has anonymized their data, email unwanted
     if user.anonymize_data:
         return
-    print('bbbbbbbbbbbb')
 
     # If any team belonging to organization has ingested events, email unnecessary
     for team in organization.teams.all():
         if team.event_set.exists():
             return
 
-    print('cccccccccccc')
     # If user's email address is invalid, email impossible
     try:
         validate_email(user.email)
     except ValidationError:
         return
-    print('dddddddddd')
 
     record, created = UserMessagingRecord.objects.get_or_create(
         user=user, campaign=campaign,
@@ -54,7 +49,6 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int, organization_id: s
         Mail.send_no_event_ingestion_follow_up(user.email, user.first_name)
         record.sent_at = timezone.now()
         record.save()
-    print('eeeeeeeeee')
 
     posthoganalytics.capture(
         user.distinct_id, f"sent campaign {campaign}", properties={"medium": "email"},
