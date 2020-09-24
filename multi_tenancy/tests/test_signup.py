@@ -144,7 +144,7 @@ class TestTeamSignup(TransactionBaseTest):
                 "plan": "startup",
             },
         )
-        print(response.body)
+        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]

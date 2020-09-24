@@ -605,7 +605,7 @@ class TestOrganizationBilling(TransactionBaseTest):
         # Check that the period end & price ID was NOT updated
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, None)
-        self.assertEqual(instance.price_id, "")
+        self.assertEqual(instance.plan.price_id, "")
 
     def test_webhook_with_invalid_payload_fails(self):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"

@@ -4,7 +4,7 @@ from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, Team
 
-from multi_tenancy.stripe import create_subscription, create_zero_auth
+from .stripe import create_subscription, create_zero_auth
 
 
 class Plan(models.Model):
