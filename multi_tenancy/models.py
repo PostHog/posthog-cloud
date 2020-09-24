@@ -2,9 +2,9 @@ from typing import Optional, Tuple
 
 from django.db import models
 from django.utils import timezone
+from posthog.models import Organization, Team
 
 from multi_tenancy.stripe import create_subscription, create_zero_auth
-from posthog.models import Team, Organization
 
 
 class Plan(models.Model):
@@ -69,8 +69,8 @@ class TeamBilling(models.Model):
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
-    def get_price_id(self) -> str:
-        return self.plan.price_id if self.plan else ""
+    def get_plan_key(self) -> str:
+        return self.plan.key if self.plan else None
 
 
 class OrganizationBilling(models.Model):
@@ -102,5 +102,5 @@ class OrganizationBilling(models.Model):
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
-    def get_price_id(self) -> str:
-        return self.plan.price_id if self.plan else ""
+    def get_plan_key(self) -> str:
+        return self.plan.key if self.plan else None
