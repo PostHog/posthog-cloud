@@ -63,7 +63,7 @@ def user_with_billing(request: HttpRequest):
                     instance.stripe_checkout_session
                     and instance.checkout_session_created_at
                     and instance.checkout_session_created_at
-                    + datetime.timedelta(minutes=1439)
+                    + timezone.timedelta(minutes=1439)
                     > timezone.now()
                 ):
                     # Checkout session has been created and is still active (i.e. created less than 24 hours ago)
@@ -198,7 +198,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         # default behavior is setting the plan for 1 year from registration.
         elif event["type"] == "payment_intent.amount_capturable_updated":
             instance.billing_period_ends = (
-                instance.organization.created_at + datetime.timedelta(days=365)
+                instance.organization.created_at + timezone.timedelta(days=365)
             )
             instance.save()
 

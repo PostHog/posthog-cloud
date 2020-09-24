@@ -1,5 +1,6 @@
 import datetime
 import random
+from time import time
 from typing import Dict
 from unittest.mock import MagicMock, patch
 
@@ -213,7 +214,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             should_setup_billing=True,
             plan=plan,
             stripe_checkout_session="cs_987654321",
-            checkout_session_created_at=timezone.now() - datetime.timedelta(hours=23),
+            checkout_session_created_at=timezone.now() - timezone.timedelta(hours=23),
         )
         self.client.force_login(user)
 
@@ -252,7 +253,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             plan=plan,
             stripe_checkout_session="cs_ABCDEFGHIJ",
             checkout_session_created_at=timezone.now()
-            - datetime.timedelta(hours=24, minutes=2),
+            - timezone.timedelta(hours=24, minutes=2),
         )
         self.client.force_login(user)
 
@@ -282,7 +283,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             should_setup_billing=True,
             plan=plan,
             billing_period_ends=timezone.now()
-            + datetime.timedelta(minutes=random.randint(10, 99)),
+            + timezone.timedelta(minutes=random.randint(10, 99)),
         )
         self.client.force_login(user)
 
@@ -358,7 +359,7 @@ class TestOrganizationBilling(TransactionBaseTest):
     # Stripe webhooks
 
     def generate_webhook_signature(
-        self, payload: str, secret: str, timestamp: datetime.datetime = None,
+        self, payload: str, secret: str, timestamp: timezone.datetime = None,
     ) -> str:
         timestamp = timezone.now() if not timestamp else timestamp
         computed_timestamp: int = int(timestamp.timestamp())
@@ -463,7 +464,7 @@ class TestOrganizationBilling(TransactionBaseTest):
         instance.refresh_from_db()
         self.assertEqual(
             instance.billing_period_ends,
-            datetime.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
+            timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
 
     @patch("multi_tenancy.views.cancel_payment_intent")
@@ -474,7 +475,7 @@ class TestOrganizationBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         organization, team, user = self.create_org_team_user()
-        team.created_at = datetime.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
+        team.created_at = timezone.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
         team.save()
         startup_plan = Plan.objects.create(
             key="startup", name="Startup", price_id="not_set",
@@ -545,7 +546,7 @@ class TestOrganizationBilling(TransactionBaseTest):
         instance.refresh_from_db()
         self.assertEqual(
             instance.billing_period_ends,
-            datetime.datetime(2020, 12, 31, 0, 0, 0, tzinfo=pytz.UTC),
+            timezone.datetime(2020, 12, 31, 0, 0, 0, tzinfo=pytz.UTC),
         )
 
         # Check that the payment is cancelled (i.e. not captured)
@@ -604,8 +605,8 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         # Check that the period end & price ID was NOT updated
         instance.refresh_from_db()
-        self.assertEqual(instance.billing_period_ends, None)
-        self.assertEqual(instance.plan.price_id, "")
+        self.assertIsNone(instance.billing_period_ends)
+        self.assertIsNone(instance.plan)
 
     def test_webhook_with_invalid_payload_fails(self):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
