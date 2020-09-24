@@ -71,6 +71,9 @@ class TeamBilling(models.Model):
 
     def get_plan_key(self) -> str:
         return self.plan.key if self.plan else None
+    
+    def get_price_id(self) -> str:
+        return self.plan.price_id if self.plan else ""
 
 
 class OrganizationBilling(models.Model):
@@ -103,3 +106,6 @@ class OrganizationBilling(models.Model):
 
     def get_plan_key(self) -> str:
         return self.plan.key if self.plan else None
+    
+    def get_price_id(self) -> str:
+        return self.plan.price_id if self.plan else ""
