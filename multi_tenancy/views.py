@@ -62,7 +62,7 @@ def user_with_billing(request: HttpRequest):
                     instance.stripe_checkout_session
                     and instance.checkout_session_created_at
                     and instance.checkout_session_created_at
-                    + datetime.timedelta(minutes=1439)
+                    + timezone.timedelta(minutes=1439)
                     > timezone.now()
                 ):
                     # Checkout session has been created and is still active (i.e. created less than 24 hours ago)

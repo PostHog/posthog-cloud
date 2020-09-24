@@ -1,5 +1,6 @@
 import datetime
 import random
+from time import time
 from typing import Dict
 from unittest.mock import MagicMock, patch
 
@@ -222,7 +223,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             should_setup_billing=True,
             plan=plan,
             stripe_checkout_session="cs_987654321",
-            checkout_session_created_at=timezone.now() - datetime.timedelta(hours=23),
+            checkout_session_created_at=timezone.now() - timezone.timedelta(hours=23),
         )
         self.client.force_login(user)
 
@@ -261,7 +262,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             plan=plan,
             stripe_checkout_session="cs_ABCDEFGHIJ",
             checkout_session_created_at=timezone.now()
-            - datetime.timedelta(hours=24, minutes=2),
+            - timezone.timedelta(hours=24, minutes=2),
         )
         self.client.force_login(user)
 
@@ -291,7 +292,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             should_setup_billing=True,
             plan=plan,
             billing_period_ends=timezone.now()
-            + datetime.timedelta(minutes=random.randint(10, 99)),
+            + timezone.timedelta(minutes=random.randint(10, 99)),
         )
         self.client.force_login(user)
 
@@ -371,7 +372,7 @@ class TestOrganizationBilling(TransactionBaseTest):
     # Stripe webhooks
 
     def generate_webhook_signature(
-        self, payload: str, secret: str, timestamp: datetime.datetime = None,
+        self, payload: str, secret: str, timestamp: timezone.datetime = None,
     ) -> str:
         timestamp = timezone.now() if not timestamp else timestamp
         computed_timestamp: int = int(timestamp.timestamp())
@@ -476,7 +477,7 @@ class TestOrganizationBilling(TransactionBaseTest):
         instance.refresh_from_db()
         self.assertEqual(
             instance.billing_period_ends,
-            datetime.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
+            timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
 
     @patch("multi_tenancy.views.cancel_payment_intent")

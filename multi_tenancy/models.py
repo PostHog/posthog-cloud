@@ -79,7 +79,6 @@ class OrganizationBilling(models.Model):
     organization: models.OneToOneField = models.OneToOneField(
         Organization,
         on_delete=models.CASCADE,
-        parent_link=True,
         primary_key=True,
         related_name="billing",
     )
