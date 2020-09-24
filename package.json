@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "heroku-postbuild": "bin/pull_main && cd deploy && npm install --dev && npm run build && cp requirements.txt ../",
-    "build": ""
+    "build": "cd deploy && yarn build"
   },
   "cacheDirectories": [
     "deploy/posthog/node_modules"
@@ -12,10 +12,10 @@
     "type": "git",
     "url": "git+https://github.com/posthog/posthog-production.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "PostHog Inc.",
   "bugs": {
     "url": "https://github.com/posthog/posthog-production/issues"
   },
-  "homepage": "https://github.com/posthog/posthog-production#readme"
+  "homepage": "https://github.com/posthog/posthog-production#readme",
+  "private": true
 }

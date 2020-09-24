@@ -20,3 +20,4 @@ echo
 pip install -r requirements.txt
 echo
 yarn # to run husky when creating a git commit
+yarn build # to avoid missing frontend issues
