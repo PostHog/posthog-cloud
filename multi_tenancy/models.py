@@ -69,7 +69,8 @@ class TeamBilling(models.Model):
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
-    def get_price_id(self) -> str:
+    @property
+    def price_id(self) -> str:
         return self.plan.price_id if self.plan else ""
 
 
@@ -102,5 +103,6 @@ class OrganizationBilling(models.Model):
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
-    def get_price_id(self) -> str:
+    @property
+    def price_id(self) -> str:
         return self.plan.price_id if self.plan else ""

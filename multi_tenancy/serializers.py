@@ -35,3 +35,4 @@ class PlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
         fields = ["key", "name", "custom_setup_billing_message"]
+        read_only_fields = ["key", "name", "custom_setup_billing_message"]

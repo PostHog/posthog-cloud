@@ -135,7 +135,7 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
         response = self.client.post(
-            "/api/team/signup/",
+            "/api/team/signup",
             {
                 "first_name": "John",
                 "email": "hedgehog@posthog.com",
@@ -144,6 +144,7 @@ class TestTeamSignup(TransactionBaseTest):
                 "plan": "startup",
             },
         )
+        print(response.body)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]

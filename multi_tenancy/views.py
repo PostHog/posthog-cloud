@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 from typing import Dict
-from django.contrib.auth import login
 
 import pytz
 from django.conf import settings
@@ -19,7 +18,6 @@ from sentry_sdk import capture_exception, capture_message
 import stripe
 from multi_tenancy.serializers import PlanSerializer
 from multi_tenancy.stripe import (
-    create_subscription,
     cancel_payment_intent,
     customer_portal_url,
     parse_webhook,
@@ -200,7 +198,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         # default behavior is setting the plan for 1 year from registration.
         elif event["type"] == "payment_intent.amount_capturable_updated":
             instance.billing_period_ends = (
-                instance.team.created_at + datetime.timedelta(days=365)
+                instance.organization.created_at + datetime.timedelta(days=365)
             )
             instance.save()
 
