@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='OrganizationBilling',
             fields=[
-                ('organization', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, related_name='billing', serialize=False, to='posthog.Organization')),
+                ('organization', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, primary_key=True, related_name='billing', serialize=False, to='posthog.Organization')),
                 ('stripe_customer_id', models.CharField(blank=True, max_length=128)),
                 ('stripe_checkout_session', models.CharField(blank=True, max_length=128)),
                 ('checkout_session_created_at', models.DateTimeField(blank=True, null=True)),

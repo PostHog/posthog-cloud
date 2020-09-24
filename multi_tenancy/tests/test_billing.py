@@ -475,8 +475,8 @@ class TestOrganizationBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         organization, team, user = self.create_org_team_user()
-        team.created_at = timezone.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
-        team.save()
+        organization.created_at = timezone.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
+        organization.save()
         startup_plan = Plan.objects.create(
             key="startup", name="Startup", price_id="not_set",
         )
