@@ -7,12 +7,11 @@ import pytz
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
-from rest_framework import status
-
-from multi_tenancy.models import Plan, OrganizationBilling
+from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
 from posthog.api.test.base import BaseTest, TransactionBaseTest
 from posthog.models import Team, User
+from rest_framework import status
 
 
 class TestPlan(BaseTest):
@@ -35,7 +34,13 @@ class TestOrganizationBilling(TransactionBaseTest):
     TESTS_API = True
 
     def create_org_team_user(self):
-        return User.objects.bootstrap(company_name="Z", first_name="X", email=f"user{random.randint(100, 999)}@posthog.com", password=self.TESTS_PASSWORD, team_fields={"api_token": "token123"})
+        return User.objects.bootstrap(
+            company_name="Z",
+            first_name="X",
+            email=f"user{random.randint(100, 999)}@posthog.com",
+            password=self.TESTS_PASSWORD,
+            team_fields={"api_token": "token123"},
+        )
 
     def create_plan(self, **kwargs):
         return Plan.objects.create(
@@ -62,7 +67,9 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         # OrganizationBilling object should've been created if non-existent
         self.assertEqual(OrganizationBilling.objects.count(), count + 1)
-        team_billing: OrganizationBilling = OrganizationBilling.objects.get(organization=self.organization)
+        team_billing: OrganizationBilling = OrganizationBilling.objects.get(
+            organization=self.organization
+        )
 
         # Test default values for OrganizationBilling
         self.assertEqual(team_billing.should_setup_billing, False)
@@ -71,7 +78,9 @@ class TestOrganizationBilling(TransactionBaseTest):
 
     def test_team_that_should_not_set_up_billing(self):
         organization, team, user = self.create_org_team_user()
-        OrganizationBilling.objects.create(organization=organization, should_setup_billing=False)
+        OrganizationBilling.objects.create(
+            organization=organization, should_setup_billing=False
+        )
         self.client.force_login(user)
 
         response = self.client.post("/api/user/")
@@ -309,7 +318,9 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         organization, team, user = self.create_org_team_user()
         instance: OrganizationBilling = OrganizationBilling.objects.create(
-            organization=organization, should_setup_billing=True, plan=self.create_plan(),
+            organization=organization,
+            should_setup_billing=True,
+            plan=self.create_plan(),
         )
         self.client.force_login(user)
 
@@ -329,7 +340,9 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         organization, team, user = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=organization, should_setup_billing=True, stripe_customer_id="cus_12345678",
+            organization=organization,
+            should_setup_billing=True,
+            stripe_customer_id="cus_12345678",
         )
         self.client.force_login(user)
 
@@ -474,8 +487,6 @@ class TestOrganizationBilling(TransactionBaseTest):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
 
         organization, team, user = self.create_org_team_user()
-        team.created_at = datetime.datetime(2020, 1, 1, 0, 0, tzinfo=pytz.UTC)
-        team.save()
         startup_plan = Plan.objects.create(
             key="startup", name="Startup", price_id="not_set",
         )
@@ -541,11 +552,15 @@ class TestOrganizationBilling(TransactionBaseTest):
             )
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check that the period end was updated (1 year from account creation)
+        # Check that the period end was updated (1 year from now)
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.billing_period_ends,
-            datetime.datetime(2020, 12, 31, 0, 0, 0, tzinfo=pytz.UTC),
+        self.assertTrue(
+            (
+                timezone.now()
+                + datetime.timedelta(days=365)
+                - instance.billing_period_ends
+            ).total_seconds(),
+            2,
         )
 
         # Check that the payment is cancelled (i.e. not captured)
@@ -602,10 +617,9 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         capture_exception.assert_called_once()
 
-        # Check that the period end & price ID was NOT updated
+        # Check that the period end was NOT updated
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, None)
-        self.assertEqual(instance.plan.price_id, "")
 
     def test_webhook_with_invalid_payload_fails(self):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"

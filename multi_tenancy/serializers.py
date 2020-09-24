@@ -1,12 +1,11 @@
+from messaging.tasks import process_organization_signup_messaging
+from posthog.api.team import TeamSignupSerializer
 from rest_framework import serializers
 
-from messaging.tasks import process_team_signup_messaging
-from posthog.api.team import TeamSignupSerializer
-
-from .models import Plan, OrganizationBilling
+from .models import OrganizationBilling, Plan
 
 
-class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
+class MultiTenancyOrgSignupSerializer(TeamSignupSerializer):
     plan = serializers.CharField(max_length=32, required=False)
 
     def validate_plan(self, data):
@@ -19,7 +18,9 @@ class MultiTenancyTeamSignupSerializer(TeamSignupSerializer):
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)
 
-        process_team_signup_messaging.delay(user_id=user.pk, organization_id=str(self._organization.id))
+        process_organization_signup_messaging.delay(
+            user_id=user.pk, organization_id=str(self._organization.id)
+        )
 
         if plan:
             OrganizationBilling.objects.create(

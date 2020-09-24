@@ -1,19 +1,19 @@
 from django.core import mail
 from django.db.utils import IntegrityError
-from django.utils import timezone
-
-from messaging.tasks import check_and_send_no_event_ingestion_follow_up
 from messaging.models import UserMessagingRecord
+from messaging.tasks import check_and_send_no_event_ingestion_follow_up
 from posthog.api.test.base import BaseTest
 from posthog.models import Event, Team, User
-
 
 
 class TestMessaging(BaseTest):
     def setUp(cls):
         super().setUp()
         cls.organization, cls.team, cls.user = User.objects.bootstrap(
-            company_name="Test", email="test@posthog.com", password=None, first_name="John Test"
+            company_name="Test",
+            email="test@posthog.com",
+            password=None,
+            first_name="John Test",
         )
 
     def test_cannot_send_the_same_campaign_twice_to_the_same_user(self):
@@ -29,7 +29,9 @@ class TestMessaging(BaseTest):
 
     def test_check_and_send_no_event_ingestion_follow_up(self):
         with self.settings(SITE_URL="https://app.posthog.com"):
-            check_and_send_no_event_ingestion_follow_up(self.user.pk, self.organization.pk)
+            check_and_send_no_event_ingestion_follow_up(
+                self.user.pk, self.organization.pk
+            )
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
@@ -47,11 +49,15 @@ class TestMessaging(BaseTest):
             "https://app.posthog.com", mail.outbox[0].body,
         )
 
-    def test_does_not_send_event_ingestion_email_if_team_has_ingested_events(self):
+    def test_does_not_send_event_ingestion_email_if_any_team_has_ingested_events(self):
         # Object setup
         organization, team, user = User.objects.bootstrap(
-            company_name="Test III", email="test3@posthog.com", password=None, first_name="John Test III"
+            company_name="Test III",
+            email="test3@posthog.com",
+            password=None,
+            first_name="John Test III",
         )
+        Team.objects.create(organization=organization)
         Event.objects.create(team=team)
 
         check_and_send_no_event_ingestion_follow_up(user.pk, organization.pk)

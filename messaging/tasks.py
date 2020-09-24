@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.utils import timezone
-
 from posthog.models import Organization, User
 
 from .mail import Mail
@@ -12,7 +11,9 @@ from .models import UserMessagingRecord
 
 
 @shared_task
-def check_and_send_no_event_ingestion_follow_up(user_id: int, organization_id: str) -> None:
+def check_and_send_no_event_ingestion_follow_up(
+    user_id: int, organization_id: str,
+) -> None:
     """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
     campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
 
@@ -56,8 +57,8 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int, organization_id: s
 
 
 @shared_task
-def process_team_signup_messaging(user_id: int, organization_id: str) -> None:
-    """Process messaging of signed-up users."""
+def process_organization_signup_messaging(user_id: int, organization_id: str) -> None:
+    """Process messaging for recently created organizations."""
     # Send event ingestion follow-up in 24 hours, if no events have been ingested by that time
     check_and_send_no_event_ingestion_follow_up.apply_async(
         (user_id, organization_id), countdown=86_400,

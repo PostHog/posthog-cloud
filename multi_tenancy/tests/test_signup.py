@@ -1,10 +1,9 @@
 from unittest.mock import patch
 
-from rest_framework import status
-
-from multi_tenancy.models import Plan, OrganizationBilling
+from multi_tenancy.models import OrganizationBilling, Plan
 from posthog.api.test.base import TransactionBaseTest
-from posthog.models import Team, User, Organization
+from posthog.models import Organization, Team, User
+from rest_framework import status
 
 
 class TestTeamSignup(TransactionBaseTest):
@@ -14,7 +13,7 @@ class TestTeamSignup(TransactionBaseTest):
             email="firstuser@posthog.com",
         )  # to ensure consistency in tests
 
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
     @patch("posthog.api.team.posthoganalytics.identify")
     @patch("posthog.api.team.posthoganalytics.capture")
     def test_api_sign_up(self, mock_capture, mock_identify, mock_messaging):
@@ -81,11 +80,13 @@ class TestTeamSignup(TransactionBaseTest):
         # Assert that the password was correctly saved
         self.assertTrue(user.check_password("notsecure"))
 
-        # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
+        # Check that the process_organization_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(
+            user_id=user.id, organization_id=str(organization.id)
+        )
 
     @patch("posthoganalytics.capture")
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_default_user_sign_up(self, mock_messaging, mock_capture):
         """
         Most of the behavior is tested on the main repo @ posthog.api.test.test_team,
@@ -121,11 +122,13 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["email"], "hedgehog5@posthog.com")
 
-        # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
+        # Check that the process_organization_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(
+            user_id=user.id, organization_id=str(organization.id)
+        )
 
     @patch("posthoganalytics.capture")
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_user_can_sign_up_with_a_custom_plan(self, mock_messaging, mock_capture):
         plan = Plan.objects.create(
             key="startup",
@@ -144,23 +147,23 @@ class TestTeamSignup(TransactionBaseTest):
                 "plan": "startup",
             },
         )
-        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.teams.first()
         organization: Organization = user.organizations.first()
 
         self.assertEqual(user.first_name, "John")
         self.assertEqual(user.email, "hedgehog@posthog.com")
-        self.assertEqual(team.name, "Hedgehogs United, LLC")
+        self.assertEqual(organization.name, "Hedgehogs United, LLC")
 
-        team_billing: OrganizationBilling = team.teambilling
-        self.assertEqual(team_billing.plan, plan)
-        self.assertEqual(team_billing.should_setup_billing, True)
+        org_billing: OrganizationBilling = organization.billing
+        self.assertEqual(org_billing.plan, plan)
+        self.assertEqual(org_billing.should_setup_billing, True)
 
-        # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
+        # Check that the process_organization_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(
+            user_id=user.id, organization_id=str(organization.id),
+        )
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
@@ -170,7 +173,7 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
     @patch("posthoganalytics.capture")
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_user_can_sign_up_with_an_invalid_plan(self, mock_messaging, mock_capture):
 
         response = self.client.post(
@@ -185,13 +188,12 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
-        team: Team = user.teams.first()
         organization: Organization = user.organizations.first()
 
         self.assertEqual(user.first_name, "Jane")
         self.assertEqual(user.email, "hedgehog6@posthog.com")
         self.assertFalse(
-            OrganizationBilling.objects.filter(team=team).exists(),
+            OrganizationBilling.objects.filter(organization=organization).exists(),
         )  # OrganizationBilling is not created yet
 
         # Check that we send the sign up event to PostHog analytics
@@ -201,10 +203,12 @@ class TestTeamSignup(TransactionBaseTest):
             properties={"is_first_user": False, "is_team_first_user": True},
         )
 
-        # Check that the process_team_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(user_id=user.pk, organization_id=str(organization.id))
+        # Check that the process_organization_signup_messaging task was fired
+        mock_messaging.assert_called_once_with(
+            user_id=user.pk, organization_id=str(organization.id),
+        )
 
-    @patch("messaging.tasks.process_team_signup_messaging.delay")
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
     @patch("posthog.api.team.posthoganalytics.identify")
     @patch("posthog.api.team.posthoganalytics.capture")
     def test_sign_up_multiple_teams_multi_tenancy(
@@ -263,7 +267,7 @@ class TestTeamSignup(TransactionBaseTest):
         # Assert that the password was correctly saved
         self.assertTrue(user.check_password("eruceston"))
 
-        # Check that the process_team_signup_messaging task was fired
+        # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
             user_id=user.pk, organization_id=str(user.organization.id),
         )

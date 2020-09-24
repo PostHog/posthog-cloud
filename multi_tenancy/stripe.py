@@ -91,7 +91,7 @@ def customer_portal_url(customer_id: str) -> Optional[str]:
     if settings.TEST:
         return f"/manage-my-billing/{customer_id}"
 
-    return stripe.billing_portal.Session.create(customer=customer_id,).url
+    return stripe.billing_portal.Session.create(customer=customer_id).url
 
 
 def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:

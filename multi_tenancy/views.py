@@ -10,29 +10,28 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from posthog.api.team import TeamSignupViewset
+from posthog.api.user import user
+from posthog.urls import render_template
 from rest_framework import status
-from rest_framework import exceptions
-from posthog.models import User, Team, Organization
-from multi_tenancy.models import OrganizationBilling
 from sentry_sdk import capture_exception, capture_message
+
 import stripe
+from multi_tenancy.models import OrganizationBilling
 from multi_tenancy.serializers import PlanSerializer
 from multi_tenancy.stripe import (
     cancel_payment_intent,
     customer_portal_url,
     parse_webhook,
 )
-from posthog.api.team import TeamSignupViewset
-from posthog.api.user import user
-from posthog.urls import render_template
 
-from .serializers import MultiTenancyTeamSignupSerializer
+from .serializers import MultiTenancyOrgSignupSerializer
 
 logger = logging.getLogger(__name__)
 
 
-class MultiTenancyTeamSignupViewset(TeamSignupViewset):
-    serializer_class = MultiTenancyTeamSignupSerializer
+class MultiTenancyOrgSignupViewset(TeamSignupViewset):
+    serializer_class = MultiTenancyOrgSignupSerializer
 
 
 def user_with_billing(request: HttpRequest):
@@ -46,7 +45,7 @@ def user_with_billing(request: HttpRequest):
     if response.status_code == 200:
         # TODO: Handle multiple organizations
         instance, created = OrganizationBilling.objects.get_or_create(
-            organization=request.user.organization
+            organization=request.user.organization,
         )
 
         if instance.plan:
@@ -117,7 +116,7 @@ def stripe_billing_portal(request: HttpRequest):
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
     instance, created = OrganizationBilling.objects.get_or_create(
-        organization=request.user.organization
+        organization=request.user.organization,
     )
 
     if instance.stripe_customer_id:
@@ -134,7 +133,9 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            team_billing = OrganizationBilling.objects.get(stripe_checkout_session=session_id)
+            team_billing = OrganizationBilling.objects.get(
+                stripe_checkout_session=session_id,
+            )
         except OrganizationBilling.DoesNotExist:
             pass
         else:
@@ -197,9 +198,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         # Special handling for plans that only do card validation (e.g. startup);
         # default behavior is setting the plan for 1 year from registration.
         elif event["type"] == "payment_intent.amount_capturable_updated":
-            instance.billing_period_ends = (
-                instance.organization.created_at + datetime.timedelta(days=365)
-            )
+            instance.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
             instance.save()
 
             # Attempt to cancel the validation charge
