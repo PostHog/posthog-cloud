@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.utils import timezone
-from posthog.models import Organization, User
+from posthog.models import Organization, User, Event
 
 from .mail import Mail
 from .models import UserMessagingRecord
@@ -28,6 +28,13 @@ def check_and_send_no_event_ingestion_follow_up(
         return
 
     # If any team the user belongs to has ingested events, email unnecessary
+    print()
+    print(list(user.teams.all()))
+    print()
+    print(list(user.teams.filter(ingested_event=True)))
+    print()
+    print(list(Event.objects.all()))
+    print()
     if user.teams.filter(ingested_event=True).exists():
         return
 
