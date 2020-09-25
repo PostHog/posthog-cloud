@@ -28,15 +28,9 @@ def check_and_send_no_event_ingestion_follow_up(
         return
 
     # If any team the user belongs to has ingested events, email unnecessary
-    print()
-    print(list(user.teams.all()))
-    print()
-    print(list(user.teams.filter(ingested_event=True)))
-    print()
-    print(list(Event.objects.all()))
-    print()
-    if user.teams.filter(ingested_event=True).exists():
-        return
+    for team in user.teams.all():
+        if team.event_set.exists():
+            return
 
     # If user's email address is invalid, email impossible
     try:
