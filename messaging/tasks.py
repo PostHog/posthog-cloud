@@ -12,7 +12,7 @@ from .models import UserMessagingRecord
 
 @shared_task
 def check_and_send_no_event_ingestion_follow_up(
-    user_id: int, dummy # temporary dummy arg to retain compatibilty with tasks queued pre-merge that still have 2 args
+    user_id: int
 ) -> None:
     """Send a follow-up email to a user whose all teams still have no events."""
     campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
@@ -62,5 +62,5 @@ def process_organization_signup_messaging(user_id: int, organization_id: str) ->
     """Process messaging for recently created organizations."""
     # Send event ingestion follow-up in 24 hours, if no events have been ingested by that time
     check_and_send_no_event_ingestion_follow_up.apply_async(
-        (user_id, organization_id), countdown=86_400,
+        (user_id,), countdown=86_400,
     )
