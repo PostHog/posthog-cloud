@@ -12,22 +12,24 @@ from .models import UserMessagingRecord
 
 @shared_task
 def check_and_send_no_event_ingestion_follow_up(
-    user_id: int, organization_id: str,
+    user_id: int, dummy # temporary dummy arg to retain compatibilty with tasks queued pre-merge that still have 2 args
 ) -> None:
-    """Send a follow-up email to a user that has signed up for a team that has not ingested events yet."""
+    """Send a follow-up email to a user whose all teams still have no events."""
     campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
 
-    user: User = User.objects.get(id=user_id)
-    organization: Organization = Organization.objects.get(id=organization_id)
+    try:
+        user: User = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        # if user removed their account, email useless
+        return
 
     # If user has anonymized their data, email unwanted
     if user.anonymize_data:
         return
 
-    # If any team belonging to organization has ingested events, email unnecessary
-    for team in organization.teams.all():
-        if team.event_set.exists():
-            return
+    # If any team the user belongs to has ingested events, email unnecessary
+    if user.teams.filter(ingested_event=True).exists():
+        return
 
     # If user's email address is invalid, email impossible
     try:
@@ -42,11 +44,9 @@ def check_and_send_no_event_ingestion_follow_up(
     with transaction.atomic():
         # Lock object (database-level) while the message is sent
         record = UserMessagingRecord.objects.select_for_update().get(pk=record.pk)
-
-        # If an email for this campaign was already sent, email unwanted
+        # If an email for this campaign was already sent to this user, email unwanted
         if record.sent_at:
             return
-
         Mail.send_no_event_ingestion_follow_up(user.email, user.first_name)
         record.sent_at = timezone.now()
         record.save()
