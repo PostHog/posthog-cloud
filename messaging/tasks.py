@@ -4,17 +4,18 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.utils import timezone
-from posthog.models import Organization, User, Event
+from posthog.models import Event, User
 
 from .mail import Mail
 from .models import UserMessagingRecord
 
 
 @shared_task
-def check_and_send_no_event_ingestion_follow_up(
-    user_id: int
-) -> None:
-    """Send a follow-up email to a user whose all teams still have no events."""
+def check_and_send_no_event_ingestion_follow_up(user_id: int) -> None:
+    """
+    Send a follow-up email after sign up if **none** of the user's teams have ingested any events.
+    """
+
     campaign: str = UserMessagingRecord.NO_EVENT_INGESTION_FOLLOW_UP
 
     try:
@@ -28,9 +29,8 @@ def check_and_send_no_event_ingestion_follow_up(
         return
 
     # If any team the user belongs to has ingested events, email unnecessary
-    for team in user.teams.all():
-        if team.event_set.exists():
-            return
+    if Event.objects.filter(team__in=user.teams.all()).exists():
+        return
 
     # If user's email address is invalid, email impossible
     try:
