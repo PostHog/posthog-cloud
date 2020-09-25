@@ -14,10 +14,11 @@ from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
 from posthog.urls import render_template
 from rest_framework import status
+from rest_framework.viewsets import ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
-from multi_tenancy.models import OrganizationBilling
+from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.serializers import PlanSerializer
 from multi_tenancy.stripe import (
     cancel_payment_intent,
@@ -32,6 +33,14 @@ logger = logging.getLogger(__name__)
 
 class MultiTenancyOrgSignupViewset(TeamSignupViewset):
     serializer_class = MultiTenancyOrgSignupSerializer
+
+
+class PlanViewset(ModelViewSet):
+    serializer_class = PlanSerializer
+    lookup_field = "key"
+
+    def get_queryset(self):
+        return Plan.objects.filter(is_active=True)
 
 
 def user_with_billing(request: HttpRequest):

@@ -1,7 +1,6 @@
 from django.contrib import admin
 
-from .models import Plan, OrganizationBilling
-
+from .models import OrganizationBilling, Plan
 
 
 @admin.register(OrganizationBilling)
@@ -29,6 +28,9 @@ class PlanAdmin(admin.ModelAdmin):
         "key",
         "name",
         "price_id",
+        "is_active",
+        "self_serve",
+        "event_allowance",
     )
 
     def get_queryset(self, request):

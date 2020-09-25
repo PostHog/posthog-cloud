@@ -1,12 +1,13 @@
 from typing import List
 
 from django.contrib.auth import decorators
-from django.urls import re_path
+from django.urls import path, re_path
 from posthog.urls import home, opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
 
 from .views import (
     MultiTenancyOrgSignupViewset,
+    PlanViewset,
     billing_failed_view,
     billing_hosted_view,
     billing_welcome_view,
@@ -50,6 +51,14 @@ urlpatterns += [
     opt_slash_path(
         "billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook",
     ),  # Stripe Webhook
+    opt_slash_path(
+        "plans", PlanViewset.as_view({"get": "list"}), name="billing_plans",
+    ),
+    path(
+        "plans/<str:key>",
+        PlanViewset.as_view({"get": "retrieve"}),
+        name="billing_plan",
+    ),
     re_path(
         r"^.*", decorators.login_required(home),
     ),  # Should always be at the very last position

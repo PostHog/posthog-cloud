@@ -10,7 +10,7 @@ from django.test import Client
 from django.utils import timezone
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
-from posthog.api.test.base import BaseTest, TransactionBaseTest
+from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
 from posthog.models import Team, User
 from rest_framework import status
 
@@ -30,7 +30,19 @@ class TestPlan(BaseTest):
         )
 
 
-class TestOrganizationBilling(TransactionBaseTest):
+class PlanTestMixin:
+    def create_plan(self, **kwargs):
+        return Plan.objects.create(
+            **{
+                "key": f"plan_{random.randint(100000, 999999)}",
+                "price_id": f"price_{random.randint(1000000, 9999999)}",
+                "name": "Test Plan",
+                **kwargs,
+            },
+        )
+
+
+class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
     TESTS_API = True
 
@@ -41,16 +53,6 @@ class TestOrganizationBilling(TransactionBaseTest):
             email=f"user{random.randint(100, 999)}@posthog.com",
             password=self.TESTS_PASSWORD,
             team_fields={"api_token": "token123"},
-        )
-
-    def create_plan(self, **kwargs):
-        return Plan.objects.create(
-            **{
-                "key": f"plan_{random.randint(100000, 999999)}",
-                "price_id": f"price_{random.randint(1000000, 9999999)}",
-                "name": "Test Plan",
-                **kwargs,
-            },
         )
 
     # Setting up billing
@@ -749,3 +751,68 @@ class TestOrganizationBilling(TransactionBaseTest):
     #         "price_test_1"  # price_test_1 is not on posthog.models.user.License.PLANS
     #     )
     #     self.assertFalse(self.user.is_feature_available("whatever"))
+
+
+class PlanTestCase(APIBaseTest, PlanTestMixin):
+    def setUp(self):
+        super().setUp()
+
+        for _i in range(0, 3):
+            self.create_plan()
+
+        self.create_plan(is_active=False)
+        self.create_plan(event_allowance=49334, self_serve=True)
+
+    def test_listing_and_retrieving_plans(self):
+        response = self.client.get("/plans")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["count"], Plan.objects.exclude(is_active=False).count(),
+        )
+
+        for item in response.data["results"]:
+            obj = Plan.objects.get(key=item["key"])
+
+            self.assertEqual(
+                list(item.keys()),
+                [
+                    "key",
+                    "name",
+                    "custom_setup_billing_message",
+                    "allowance",
+                    "image_url",
+                    "self_serve",
+                ],
+            )
+
+            if obj.event_allowance:
+                self.assertEqual(
+                    item["allowance"], {"value": 49334, "formatted": "49.3K"},
+                )
+
+            retrieve_response = self.client.get(f"/plans/{obj.key}")
+            self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
+            self.assertEqual(
+                retrieve_response.data, item,
+            )  # Retrieve response is equal to list response
+
+    def test_inactive_plans_cannot_be_retrieved(self):
+        plan = self.create_plan(is_active=False)
+        response = self.client.get(f"/plans/{plan.key}")
+        self.assertEqual(response.json(), {"detail": "Not found."})
+
+    def test_cannot_update_plans(self):
+        plan = self.create_plan()
+
+        # PUT UPDATE
+        response = self.client.put(f"/plans/{plan.key}", {"price_id": "new_pricing"})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        plan.refresh_from_db()
+        self.assertNotEqual(plan.price_id, "new_pricing")
+
+        # PATCH UPDATE
+        response = self.client.patch(f"/plans/{plan.key}", {"price_id": "new_pricing"})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        plan.refresh_from_db()
+        self.assertNotEqual(plan.price_id, "new_pricing")
+
