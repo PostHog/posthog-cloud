@@ -11,7 +11,7 @@ from django.utils import timezone
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
 from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
-from posthog.models import Team, User
+from posthog.models import Event, User
 from rest_framework import status
 
 
@@ -64,9 +64,10 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        self.assertNotIn(
-            "billing", response_data,
-        )  # key should not be present if plan = `None`
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"formatted": "0", "value": 0}},
+        )
 
         # OrganizationBilling object should've been created if non-existent
         self.assertEqual(OrganizationBilling.objects.count(), count + 1)
@@ -86,13 +87,17 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         )
         self.client.force_login(user)
 
+        for _i in range(0, 3):
+            Event.objects.create(team=team)
+
         response = self.client.post("/api/user/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        self.assertNotIn(
-            "billing", response_data,
-        )  # key should not be present if plan = `None`
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"value": 3, "formatted": "3"}},
+        )
 
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_team_that_should_set_up_billing_starts_a_checkout_session(
@@ -320,16 +325,14 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         response_data = self.client.post("/api/user/").json()
 
         self.assertEqual(
-            response_data["billing"],
+            response_data["billing"]["plan"],
             {
-                "plan": {
-                    "key": plan.key,
-                    "name": plan.name,
-                    "custom_setup_billing_message": "",
-                    "allowance": {"value": 8500000, "formatted": "8.5M"},
-                    "image_url": "http://test.posthog.com/image.png",
-                    "self_serve": True,
-                },
+                "key": plan.key,
+                "name": plan.name,
+                "custom_setup_billing_message": "",
+                "allowance": {"value": 8500000, "formatted": "8.5M"},
+                "image_url": "http://test.posthog.com/image.png",
+                "self_serve": True,
             },
         )
 

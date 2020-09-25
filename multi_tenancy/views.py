@@ -12,21 +12,18 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
+from posthog.templatetags.posthog_filters import compact_number
 from posthog.urls import render_template
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
-from multi_tenancy.models import OrganizationBilling, Plan
-from multi_tenancy.serializers import PlanSerializer
-from multi_tenancy.stripe import (
-    cancel_payment_intent,
-    customer_portal_url,
-    parse_webhook,
-)
 
-from .serializers import MultiTenancyOrgSignupSerializer
+from .models import OrganizationBilling, Plan
+from .serializers import MultiTenancyOrgSignupSerializer, PlanSerializer
+from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
+from .utils import get_monthly_event_usage
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +54,21 @@ def user_with_billing(request: HttpRequest):
             organization=request.user.organization,
         )
 
-        if instance.plan:
+        output = json.loads(response.content)
+        event_usage: int = get_monthly_event_usage(request.user.organization)
+        output["billing"] = {
+            "plan": None,
+            "current_usage": {
+                "value": event_usage,
+                "formatted": compact_number(event_usage),
+            },
+        }
 
+        if instance.plan:
             plan_serializer = PlanSerializer()
-            output = json.loads(response.content)
-            output["billing"] = {
-                "plan": plan_serializer.to_representation(instance=instance.plan),
-            }
+            output["billing"]["plan"] = plan_serializer.to_representation(
+                instance=instance.plan,
+            )
 
             if instance.should_setup_billing and not instance.is_billing_active:
 
@@ -106,7 +111,7 @@ def user_with_billing(request: HttpRequest):
                         "subscription_url": f"/billing/setup?session_id={checkout_session}",
                     }
 
-            response = JsonResponse(output)
+        response = JsonResponse(output)
 
     return response
 
