@@ -68,19 +68,19 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         # OrganizationBilling object should've been created if non-existent
         self.assertEqual(OrganizationBilling.objects.count(), count + 1)
-        team_billing: OrganizationBilling = OrganizationBilling.objects.get(
-            organization=self.organization
+        org_billing: OrganizationBilling = OrganizationBilling.objects.get(
+            organization=self.organization,
         )
 
         # Test default values for OrganizationBilling
-        self.assertEqual(team_billing.should_setup_billing, False)
-        self.assertEqual(team_billing.stripe_customer_id, "")
-        self.assertEqual(team_billing.stripe_checkout_session, "")
+        self.assertEqual(org_billing.should_setup_billing, False)
+        self.assertEqual(org_billing.stripe_customer_id, "")
+        self.assertEqual(org_billing.stripe_checkout_session, "")
 
     def test_team_that_should_not_set_up_billing(self):
         organization, team, user = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=organization, should_setup_billing=False
+            organization=organization, should_setup_billing=False,
         )
         self.client.force_login(user)
 
@@ -98,7 +98,9 @@ class TestOrganizationBilling(TransactionBaseTest):
     ):
         mock_customer_id.return_value = "cus_000111222"
         organization, team, user = self.create_org_team_user()
-        plan = self.create_plan(custom_setup_billing_message="Sign up now!")
+        plan = self.create_plan(
+            custom_setup_billing_message="Sign up now!", event_allowance=50000
+        )
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
         )
@@ -133,6 +135,9 @@ class TestOrganizationBilling(TransactionBaseTest):
                 "key": plan.key,
                 "name": plan.name,
                 "custom_setup_billing_message": "Sign up now!",
+                "allowance": {"value": 50000, "formatted": "50K"},
+                "image_url": "",
+                "self_serve": False,
             },
         )
 
@@ -202,7 +207,14 @@ class TestOrganizationBilling(TransactionBaseTest):
 
         self.assertEqual(
             response_data["billing"]["plan"],
-            {"key": "startup", "name": plan.name, "custom_setup_billing_message": "",},
+            {
+                "key": "startup",
+                "name": plan.name,
+                "custom_setup_billing_message": "",
+                "allowance": None,
+                "image_url": "",
+                "self_serve": False,
+            },
         )
 
         # Check that the checkout session was saved to the database
@@ -286,7 +298,11 @@ class TestOrganizationBilling(TransactionBaseTest):
 
     def test_cannot_start_double_billing_subscription(self):
         organization, team, user = self.create_org_team_user()
-        plan = self.create_plan()
+        plan = self.create_plan(
+            event_allowance=8_500_000,
+            image_url="http://test.posthog.com/image.png",
+            self_serve=True,
+        )
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization,
             should_setup_billing=True,
@@ -308,6 +324,9 @@ class TestOrganizationBilling(TransactionBaseTest):
                     "key": plan.key,
                     "name": plan.name,
                     "custom_setup_billing_message": "",
+                    "allowance": {"value": 8500000, "formatted": "8.5M"},
+                    "image_url": "http://test.posthog.com/image.png",
+                    "self_serve": True,
                 },
             },
         )

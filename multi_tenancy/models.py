@@ -17,6 +17,14 @@ class Plan(models.Model):
     )
     custom_setup_billing_message: models.TextField = models.TextField(blank=True)
     price_id: models.CharField = models.CharField(max_length=128)
+    event_allowance: models.IntegerField = models.IntegerField(
+        default=None, null=True, blank=True,
+    )  # number of monthly events that this plan allows
+    is_active: models.BooleanField = models.BooleanField(default=True)
+    self_serve: models.BooleanField = models.BooleanField(
+        default=False,
+    )  # Whether users can subscribe to this plan by themselves **after sign up**
+    image_url: models.URLField = models.URLField(max_length=1024, blank=True)
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -71,7 +79,7 @@ class TeamBilling(models.Model):
 
     def get_plan_key(self) -> str:
         return self.plan.key if self.plan else None
-    
+
     def get_price_id(self) -> str:
         return self.plan.price_id if self.plan else ""
 
@@ -106,6 +114,6 @@ class OrganizationBilling(models.Model):
 
     def get_plan_key(self) -> str:
         return self.plan.key if self.plan else None
-    
+
     def get_price_id(self) -> str:
         return self.plan.price_id if self.plan else ""
