@@ -31,6 +31,15 @@ class TestPlan(BaseTest):
 
 
 class PlanTestMixin:
+    def create_org_team_user(self):
+        return User.objects.bootstrap(
+            company_name="Z",
+            first_name="X",
+            email=f"user{random.randint(100, 999)}@posthog.com",
+            password=self.TESTS_PASSWORD,
+            team_fields={"api_token": "token123"},
+        )
+
     def create_plan(self, **kwargs):
         return Plan.objects.create(
             **{
@@ -45,15 +54,6 @@ class PlanTestMixin:
 class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
     TESTS_API = True
-
-    def create_org_team_user(self):
-        return User.objects.bootstrap(
-            company_name="Z",
-            first_name="X",
-            email=f"user{random.randint(100, 999)}@posthog.com",
-            password=self.TESTS_PASSWORD,
-            team_fields={"api_token": "token123"},
-        )
 
     # Setting up billing
 
@@ -393,8 +393,87 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(response.status_code, status.HTTP_302_FOUND)
         self.assertEqual(response.url, "/")
 
-    # Stripe webhooks
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_organization_can_enroll_in_self_serve_plan(self, mock_customer_id):
+        mock_customer_id.return_value = "cus_000111222"
+        organization, team, user = self.create_org_team_user()
+        plan = self.create_plan(self_serve=True)
 
+        org_billing = OrganizationBilling.objects.create(
+            organization=organization,
+            should_setup_billing=True,
+            plan=self.create_plan(),
+        )  # note the org has another plan configured but no active billing subscription
+
+        self.client.force_login(user)
+
+        response = self.client.post("/billing/subscribe", {"plan": plan.key})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data,
+            {
+                "stripe_checkout_session": "cs_1234567890",
+                "subscription_url": "/billing/setup?session_id=cs_1234567890",
+            },
+        )
+
+        org_billing.refresh_from_db()
+        self.assertEqual(org_billing.stripe_checkout_session, "cs_1234567890")
+        self.assertEqual(org_billing.stripe_customer_id, "cus_000111222")
+        self.assertEqual(org_billing.plan, plan)
+        self.assertTrue(
+            (timezone.now() - org_billing.checkout_session_created_at).total_seconds()
+            <= 2,
+        )
+
+    @patch("multi_tenancy.stripe._get_customer_id")
+    def test_organization_can_enroll_in_self_serve_plan_without_having_an_organization_billing_yet(
+        self, mock_customer_id,
+    ):
+        mock_customer_id.return_value = "cus_000111222"
+        organization, team, user = self.create_org_team_user()
+        plan = self.create_plan(self_serve=True)
+
+        self.client.force_login(user)
+
+        response = self.client.post("/billing/subscribe", {"plan": plan.key})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data,
+            {
+                "stripe_checkout_session": "cs_1234567890",
+                "subscription_url": "/billing/setup?session_id=cs_1234567890",
+            },
+        )
+
+        org_billing = organization.billing
+        self.assertEqual(org_billing.stripe_checkout_session, "cs_1234567890")
+        self.assertEqual(org_billing.stripe_customer_id, "cus_000111222")
+        self.assertEqual(org_billing.plan, plan)
+        self.assertTrue(
+            (timezone.now() - org_billing.checkout_session_created_at).total_seconds()
+            <= 2,
+        )
+
+    def test_cannot_enroll_in_non_self_serve_plan(self):
+        organization, team, user = self.create_org_team_user()
+        plan = self.create_plan(self_serve=False)
+
+        org_billing = OrganizationBilling.objects.create(organization=organization)
+
+        self.client.force_login(user)
+
+        response = self.client.post("/billing/subscribe", {"plan": plan.key})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        org_billing.refresh_from_db()
+        self.assertEqual(org_billing.plan, None)
+        self.assertEqual(org_billing.stripe_checkout_session, "")
+        self.assertEqual(org_billing.stripe_customer_id, "")
+        self.assertEqual(org_billing.checkout_session_created_at, None)
+
+
+class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
     def generate_webhook_signature(
         self, payload: str, secret: str, timestamp: timezone.datetime = None,
     ) -> str:

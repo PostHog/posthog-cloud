@@ -1,10 +1,13 @@
 from typing import Dict, Optional
 
+from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from messaging.tasks import process_organization_signup_messaging
 from posthog.api.team import TeamSignupSerializer
 from posthog.models import User
 from posthog.templatetags.posthog_filters import compact_number
 from rest_framework import serializers
+from sentry_sdk import capture_exception
 
 from .models import OrganizationBilling, Plan
 
@@ -44,7 +47,7 @@ class MultiTenancyOrgSignupSerializer(TeamSignupSerializer):
         return user
 
 
-class PlanSerializer(serializers.ModelSerializer):
+class PlanSerializer(ReadOnlySerializer):
     allowance = serializers.SerializerMethodField()
 
     class Meta:
@@ -65,3 +68,60 @@ class PlanSerializer(serializers.ModelSerializer):
             "value": obj.event_allowance,
             "formatted": compact_number(obj.event_allowance),
         }
+
+
+class BillingSubscribeSerializer(serializers.Serializer):
+    """
+    Serializer allowing a user to set up billing information.
+    """
+
+    plan = serializers.SlugRelatedField(
+        slug_field="key", queryset=Plan.objects.filter(is_active=True, self_serve=True),
+    )
+
+    def create(self, validated_data: Dict) -> Dict:
+
+        assert self.context, "context is required"
+
+        user: User = self.context["request"].user
+
+        instance, _created = OrganizationBilling.objects.get_or_create(
+            organization=user.organization,
+        )
+
+        if instance.is_billing_active:
+            raise serializers.ValidationError(
+                "Your organization already has billing set up, please contact us to change.",
+            )
+
+        try:
+            (checkout_session, customer_id) = validated_data[
+                "plan"
+            ].create_checkout_session(
+                user=user,
+                team_billing=instance,
+                base_url=self.context["request"].build_absolute_uri("/"),
+            )
+        except ImproperlyConfigured as e:
+            capture_exception(e)
+            checkout_session = None
+
+        if not checkout_session:
+            raise serializers.ValidationError(
+                "Error starting your billing subscription. Please try again.",
+            )
+
+        instance.plan = validated_data["plan"]
+        instance.stripe_customer_id = customer_id
+        instance.stripe_checkout_session = checkout_session
+        instance.checkout_session_created_at = timezone.now()
+        instance.save()
+
+        return {
+            "stripe_checkout_session": checkout_session,
+            "subscription_url": f"/billing/setup?session_id={checkout_session}",
+        }
+
+    def to_representation(self, instance):
+        return instance
+

@@ -14,14 +14,18 @@ from posthog.api.team import TeamSignupViewset
 from posthog.api.user import user
 from posthog.templatetags.posthog_filters import compact_number
 from posthog.urls import render_template
-from rest_framework import status
-from rest_framework.viewsets import ModelViewSet
+from rest_framework import mixins, status
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
 
 from .models import OrganizationBilling, Plan
-from .serializers import MultiTenancyOrgSignupSerializer, PlanSerializer
+from .serializers import (
+    BillingSubscribeSerializer,
+    MultiTenancyOrgSignupSerializer,
+    PlanSerializer,
+)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_monthly_event_usage
 
@@ -40,6 +44,10 @@ class PlanViewset(ModelViewSet):
         return Plan.objects.filter(is_active=True)
 
 
+class BillingSubscribeViewset(mixins.CreateModelMixin, GenericViewSet):
+    serializer_class = BillingSubscribeSerializer
+
+
 def user_with_billing(request: HttpRequest):
     """
     Overrides the posthog.api.user.user response to include
@@ -50,7 +58,7 @@ def user_with_billing(request: HttpRequest):
 
     if response.status_code == 200:
         # TODO: Handle multiple organizations
-        instance, created = OrganizationBilling.objects.get_or_create(
+        instance, _created = OrganizationBilling.objects.get_or_create(
             organization=request.user.organization,
         )
 

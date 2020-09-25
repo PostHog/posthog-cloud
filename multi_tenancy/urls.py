@@ -6,6 +6,7 @@ from posthog.urls import home, opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
 
 from .views import (
+    BillingSubscribeViewset,
     MultiTenancyOrgSignupViewset,
     PlanViewset,
     billing_failed_view,
@@ -23,7 +24,7 @@ urlpatterns: List = [
         "api/user", user_with_billing,
     ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
     opt_slash_path(
-        "api/team/signup", MultiTenancyOrgSignupViewset.as_view()
+        "api/team/signup", MultiTenancyOrgSignupViewset.as_view(),
     ),  # Override to support setting a billing plan on signup
 ]
 
@@ -51,6 +52,11 @@ urlpatterns += [
     opt_slash_path(
         "billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook",
     ),  # Stripe Webhook
+    opt_slash_path(
+        "billing/subscribe",
+        BillingSubscribeViewset.as_view({"post": "create"}),
+        name="billing_subscribe",
+    ),
     opt_slash_path(
         "plans", PlanViewset.as_view({"get": "list"}), name="billing_plans",
     ),
