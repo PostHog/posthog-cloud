@@ -115,6 +115,7 @@ class BillingSubscribeSerializer(serializers.Serializer):
         instance.stripe_customer_id = customer_id
         instance.stripe_checkout_session = checkout_session
         instance.checkout_session_created_at = timezone.now()
+        instance.should_setup_billing = True
         instance.save()
 
         return {

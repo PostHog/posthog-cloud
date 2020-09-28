@@ -450,6 +450,7 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(org_billing.stripe_checkout_session, "cs_1234567890")
         self.assertEqual(org_billing.stripe_customer_id, "cus_000111222")
         self.assertEqual(org_billing.plan, plan)
+        self.assertEqual(org_billing.should_setup_billing, True)
         self.assertTrue(
             (timezone.now() - org_billing.checkout_session_created_at).total_seconds()
             <= 2,
