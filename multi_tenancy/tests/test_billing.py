@@ -878,6 +878,30 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                 retrieve_response.data, item,
             )  # Retrieve response is equal to list response
 
+    def test_list_self_serve_plans(self):
+        response = self.client.get("/plans?self_serve=1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["count"],
+            Plan.objects.exclude(is_active=False).exclude(self_serve=False).count(),
+        )
+
+        for item in response.data["results"]:
+            obj = Plan.objects.get(key=item["key"])
+
+            self.assertEqual(
+                list(item.keys()),
+                [
+                    "key",
+                    "name",
+                    "custom_setup_billing_message",
+                    "allowance",
+                    "image_url",
+                    "self_serve",
+                ],
+            )
+            self.assertEqual(obj.self_serve, True)
+
     def test_inactive_plans_cannot_be_retrieved(self):
         plan = self.create_plan(is_active=False)
         response = self.client.get(f"/plans/{plan.key}")

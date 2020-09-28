@@ -1,7 +1,8 @@
 import datetime
 import json
 import logging
-from typing import Dict
+from distutils.util import strtobool
+from typing import Dict, Optional
 
 import pytz
 from django.conf import settings
@@ -41,7 +42,13 @@ class PlanViewset(ModelViewSet):
     lookup_field = "key"
 
     def get_queryset(self):
-        return Plan.objects.filter(is_active=True)
+        queryset = Plan.objects.filter(is_active=True)
+
+        self_serve: Optional[str] = self.request.query_params.get("self_serve", None)
+        if self_serve is not None:
+            queryset = queryset.filter(self_serve=bool(strtobool(self_serve)))
+
+        return queryset
 
 
 class BillingSubscribeViewset(mixins.CreateModelMixin, GenericViewSet):
