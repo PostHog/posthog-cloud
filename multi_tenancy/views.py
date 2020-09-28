@@ -221,6 +221,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
                 line_items[0]["period"]["end"],
             ).replace(tzinfo=pytz.utc)
+            instance.should_setup_billing = False
 
             instance.save()
 
@@ -228,6 +229,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         # default behavior is setting the plan for 1 year from registration.
         elif event["type"] == "payment_intent.amount_capturable_updated":
             instance.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
+            instance.should_setup_billing = False
             instance.save()
 
             # Attempt to cancel the validation charge
