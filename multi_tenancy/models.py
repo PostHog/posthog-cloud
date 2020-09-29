@@ -19,7 +19,7 @@ class Plan(models.Model):
     price_id: models.CharField = models.CharField(max_length=128)
     event_allowance: models.IntegerField = models.IntegerField(
         default=None, null=True, blank=True,
-    )  # number of monthly events that this plan allows
+    )  # number of monthly events that this plan allows; use null for unlimited events
     is_active: models.BooleanField = models.BooleanField(default=True)
     self_serve: models.BooleanField = models.BooleanField(
         default=False,

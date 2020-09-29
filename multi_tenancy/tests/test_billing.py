@@ -29,6 +29,12 @@ class TestPlan(BaseTest):
             },
         )
 
+    def test_plan_has_unlimited_event_allowance_by_default(self):
+        plan = Plan.objects.create(
+            key="test_plan", name="Test Plan", price_id="price_test"
+        )
+        self.assertEqual(plan.event_allowance, None)
+
 
 class PlanTestMixin:
     def create_org_team_user(self):
