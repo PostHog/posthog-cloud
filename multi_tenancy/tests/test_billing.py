@@ -912,7 +912,7 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
     def test_inactive_plans_cannot_be_retrieved(self):
         plan = self.create_plan(is_active=False)
         response = self.client.get(f"/plans/{plan.key}")
-        self.assertEqual(response.json(), {"detail": "Not found."})
+        self.assertEqual(response.json(), {'attr': None, 'code': 'not_found', 'detail': 'Not found.','type':'invalid_request'})
 
     def test_cannot_update_plans(self):
         plan = self.create_plan()
@@ -928,4 +928,3 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
         plan.refresh_from_db()
         self.assertNotEqual(plan.price_id, "new_pricing")
-
