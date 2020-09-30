@@ -60,7 +60,7 @@ urlpatterns += [
     opt_slash_path(
         "plans", PlanViewset.as_view({"get": "list"}), name="billing_plans",
     ),
-    opt_slash_path(
+    path(
         "plans/<str:key>",
         PlanViewset.as_view({"get": "retrieve"}),
         name="billing_plan",
