@@ -21,8 +21,7 @@ def get_monthly_event_usage(
 
     date_range: Tuple[int] = calendar.monthrange(at_date.year, at_date.month)
     start_date: datetime.datetime = datetime.datetime.combine(
-        datetime.datetime(at_date.year, at_date.month, date_range[0]),
-        datetime.time.min,
+        datetime.datetime(at_date.year, at_date.month, 1), datetime.time.min,
     ).replace(tzinfo=pytz.UTC)
     end_date: datetime.datetime = datetime.datetime.combine(
         datetime.datetime(at_date.year, at_date.month, date_range[1]),
