@@ -60,7 +60,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         mock_identify.assert_called_once_with(
@@ -114,7 +114,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Assert that the user is logged in
@@ -169,7 +169,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
     @patch("posthoganalytics.capture")
@@ -200,7 +200,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Check that the process_organization_signup_messaging task was fired
@@ -247,7 +247,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         mock_identify.assert_called_once_with(
