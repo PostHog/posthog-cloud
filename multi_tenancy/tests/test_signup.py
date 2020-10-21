@@ -54,7 +54,8 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(user.email_opt_in, False)
 
         # Assert that the team was properly created
-        self.assertEqual(team.name, "Hedgehogs United, LLC")
+        self.assertEqual(organization.name, "Hedgehogs United, LLC")
+        self.assertEqual(team.name, "Default Project")
 
         # Assert that the sign up event & identify calls were sent to PostHog analytics
         mock_capture.assert_called_once_with(

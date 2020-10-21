@@ -40,7 +40,7 @@ class TestOrganizationBilling(TransactionBaseTest):
             first_name="X",
             email=f"user{random.randint(100, 999)}@posthog.com",
             password=self.TESTS_PASSWORD,
-            team_fields={"api_token": "token123"},
+            team_fields={"api_token": "token789"},
         )
 
     def create_plan(self, **kwargs):
