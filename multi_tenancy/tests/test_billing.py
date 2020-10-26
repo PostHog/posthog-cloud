@@ -1,10 +1,10 @@
 import datetime
 import random
-from time import time
 from typing import Dict
 from unittest.mock import MagicMock, patch
 
 import pytz
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
@@ -364,6 +364,26 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         instance.refresh_from_db()
         self.assertEqual(instance.stripe_checkout_session, "")
+
+    @patch("multi_tenancy.utils.get_cached_monthly_event_usage")
+    def test_event_usage_is_cached(self, mock_method):
+        organization, team, user = self.create_org_team_user()
+        self.client.force_login(user)
+
+        # Org has no events, but cached result is used
+        cache.set(f"monthly_usage_{organization.id}", 4831, 10)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Assert that the uncached method was not called
+        mock_method.assert_not_called()
+
+        response_data: Dict = response.json()
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
+        )
 
     # Manage billing
 
@@ -912,7 +932,15 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
     def test_inactive_plans_cannot_be_retrieved(self):
         plan = self.create_plan(is_active=False)
         response = self.client.get(f"/plans/{plan.key}")
-        self.assertEqual(response.json(), {'attr': None, 'code': 'not_found', 'detail': 'Not found.','type':'invalid_request'})
+        self.assertEqual(
+            response.json(),
+            {
+                "attr": None,
+                "code": "not_found",
+                "detail": "Not found.",
+                "type": "invalid_request",
+            },
+        )
 
     def test_cannot_update_plans(self):
         plan = self.create_plan()

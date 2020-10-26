@@ -28,7 +28,7 @@ from .serializers import (
     PlanSerializer,
 )
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
-from .utils import get_monthly_event_usage
+from .utils import get_cached_monthly_event_usage
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def user_with_billing(request: HttpRequest):
         )
 
         output = json.loads(response.content)
-        event_usage: int = get_monthly_event_usage(request.user.organization)
+        event_usage: int = get_cached_monthly_event_usage(request.user.organization)
         output["billing"] = {
             "plan": None,
             "current_usage": {
