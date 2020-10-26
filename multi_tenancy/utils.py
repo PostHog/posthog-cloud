@@ -3,6 +3,7 @@ import datetime
 from typing import Tuple
 
 import pytz
+from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.utils import timezone
 from posthog.models import Event, Organization
@@ -55,7 +56,8 @@ def get_cached_monthly_event_usage(organization: Organization) -> int:
     # Cache the result
     start_of_next_month = datetime.datetime.combine(
         datetime.datetime(now.year, now.month, 1), datetime.time.min,
-    ).replace(tzinfo=pytz.UTC)
+    ).replace(tzinfo=pytz.UTC) + relativedelta(months=+1)
+
     cache.set(
         cache_key,
         result,

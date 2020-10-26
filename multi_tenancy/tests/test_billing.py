@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
+from freezegun import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
 from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
@@ -93,7 +94,7 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         )
         self.client.force_login(user)
 
-        for _i in range(0, 3):
+        for _ in range(0, 3):
             Event.objects.create(team=team)
 
         response = self.client.post("/api/user/")
@@ -384,6 +385,27 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
             response_data["billing"],
             {"plan": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
         )
+
+    @freeze_time("2018-12-31T22:59:59.000000Z")
+    def test_event_usage_cache_is_reset_at_beginning_of_month(self):
+        organization, team, user = self.create_org_team_user()
+        self.client.force_login(user)
+
+        for _ in range(0, 3):
+            Event.objects.create(team=team)
+
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["billing"]["current_usage"]["value"], 3)
+
+        # Check that result was cached
+        cache_key = f"monthly_usage_{organization.id}"
+        self.assertEqual(cache.get(cache_key), 3)
+
+        # Even though default caching time is 12 hours, the result is only cached until beginning of next month
+        self.assertEqual(
+            cache._expire_info.get(cache.make_key(cache_key)), 1546300800.0,
+        )  # 1546300800 = Jan 1, 2019 00:00 UTC
 
     # Manage billing
 
@@ -866,7 +888,7 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
     def setUp(self):
         super().setUp()
 
-        for _i in range(0, 3):
+        for _ in range(0, 3):
             self.create_plan()
 
         self.create_plan(is_active=False)
