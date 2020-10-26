@@ -54,13 +54,14 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(user.email_opt_in, False)
 
         # Assert that the team was properly created
-        self.assertEqual(team.name, "Hedgehogs United, LLC")
+        self.assertEqual(organization.name, "Hedgehogs United, LLC")
+        self.assertEqual(team.name, "Default Project")
 
         # Assert that the sign up event & identify calls were sent to PostHog analytics
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         mock_identify.assert_called_once_with(
@@ -114,7 +115,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Assert that the user is logged in
@@ -169,7 +170,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
     @patch("posthoganalytics.capture")
@@ -200,7 +201,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Check that the process_organization_signup_messaging task was fired
@@ -247,7 +248,7 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_team_first_user": True},
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         mock_identify.assert_called_once_with(
