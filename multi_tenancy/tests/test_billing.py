@@ -14,7 +14,7 @@ from freezegun import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
 from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
-from posthog.models import Event, User
+from posthog.models import User
 from rest_framework import status
 
 
@@ -433,7 +433,8 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         )
         self.client.force_login(user)
 
-        response = self.client.post("/billing/manage")
+        with self.settings(STRIPE_API_KEY="sk_test_987654321"):
+            response = self.client.post("/billing/manage")
         self.assertEqual(response.status_code, status.HTTP_302_FOUND)
         self.assertEqual(response.url, "/manage-my-billing/cus_12345678")
 

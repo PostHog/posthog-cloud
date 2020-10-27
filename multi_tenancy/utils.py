@@ -45,7 +45,12 @@ def get_monthly_event_usage(
         },
     )
 
-    return result[0][0]
+    if result:
+        return result[0][0]
+
+    return (
+        -1
+    )  # use -1 to distinguish from an actual 0 in case CH is not available (mainly to run posthog tests)
 
 
 def get_cached_monthly_event_usage(organization: Organization) -> int:
