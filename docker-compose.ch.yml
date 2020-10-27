@@ -17,9 +17,9 @@ services:
     build:
       context: .
       dockerfile: dev.Dockerfile
-    command: ./bin/docker-ch-dev-web
+    command: ./deploy/bin/docker-ch-dev-web
     volumes:
-      - ..:/code
+      - .:/code
     ports:
       - "8000:8000"
       - "8234:8234"
@@ -45,9 +45,9 @@ services:
     build:
       context: .
       dockerfile: dev.Dockerfile
-    command: ./bin/docker-worker
+    command: ./deploy/bin/docker-worker
     volumes:
-      - ..:/code
+      - .:/code
     environment:
       IS_DOCKER: "true"
       DATABASE_URL: "postgres://posthog:posthog@db:5432/posthog"
