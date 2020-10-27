@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
@@ -79,7 +79,7 @@ class BillingSubscribeSerializer(serializers.Serializer):
         slug_field="key", queryset=Plan.objects.filter(is_active=True, self_serve=True),
     )
 
-    def create(self, validated_data: Dict) -> Dict:
+    def create(self, validated_data: Dict[str, Any]) -> Dict:
 
         assert self.context, "context is required"
 
