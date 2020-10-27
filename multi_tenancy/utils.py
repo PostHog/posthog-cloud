@@ -6,6 +6,7 @@ import pytz
 from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.utils import timezone
+from ee.clickhouse.client import sync_execute
 from posthog.models import Event, Organization
 
 EVENT_CACHING_EXPIRY: int = 12 * 60 * 60  # 12 hours
@@ -30,11 +31,20 @@ def get_monthly_event_usage(
         datetime.time.max,
     ).replace(tzinfo=pytz.UTC)
 
-    return Event.objects.filter(
-        team__in=organization.teams.all(),
-        timestamp__gte=start_date,
-        timestamp__lte=end_date,
-    ).count()
+    result = sync_execute(
+        "SELECT count(1) FROM events where team_id IN %(team_ids)s AND timestamp"
+        " >= %(date_from)s AND timestamp <= %(date_to)s",
+        {
+            "date_from": start_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "date_to": end_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "team_ids": organization.teams.values_list("id", flat=True),
+        },
+    )
+
+    print(organization.teams.values_list("id", flat=True))
+    print(result)
+
+    return result[0][0]
 
 
 def get_cached_monthly_event_usage(organization: Organization) -> int:
