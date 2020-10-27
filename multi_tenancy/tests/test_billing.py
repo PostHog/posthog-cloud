@@ -1,5 +1,6 @@
 import datetime
 import random
+import uuid
 from typing import Dict
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +9,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
+from ee.clickhouse.models.event import create_event
 from freezegun import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
@@ -71,12 +73,10 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        # TODO: self.assertEqual(
-        #     response_data["billing"],
-        #     {"plan": None, "current_usage": {"formatted": "0", "value": 0}},
-        # )
-
-        self.assertEqual(response_data["billing"], {"plan": None})
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"formatted": "0", "value": 0}},
+        )
 
         # OrganizationBilling object should've been created if non-existent
         self.assertEqual(OrganizationBilling.objects.count(), count + 1)
@@ -97,17 +97,22 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.client.force_login(user)
 
         for _ in range(0, 3):
-            Event.objects.create(team=team)
+            # Create some events on CH
+            create_event(
+                team=team,
+                event="$pageview",
+                distinct_id="distinct_id",
+                event_uuid=uuid.uuid4(),
+            )
 
         response = self.client.post("/api/user/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"], {"plan": None})
-        # TODO: self.assertEqual(
-        #     response_data["billing"],
-        #     {"plan": None, "current_usage": {"value": 3, "formatted": "3"}},
-        # )
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"value": 3, "formatted": "3"}},
+        )
 
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_team_that_should_set_up_billing_starts_a_checkout_session(
@@ -116,7 +121,7 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         mock_customer_id.return_value = "cus_000111222"
         organization, team, user = self.create_org_team_user()
         plan = self.create_plan(
-            custom_setup_billing_message="Sign up now!", event_allowance=50000
+            custom_setup_billing_message="Sign up now!", event_allowance=50000,
         )
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
@@ -369,48 +374,52 @@ class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         instance.refresh_from_db()
         self.assertEqual(instance.stripe_checkout_session, "")
 
-    # TODO:
-    # @patch("multi_tenancy.utils.get_cached_monthly_event_usage")
-    # def test_event_usage_is_cached(self, mock_method):
-    #     organization, team, user = self.create_org_team_user()
-    #     self.client.force_login(user)
+    @patch("multi_tenancy.utils.get_cached_monthly_event_usage")
+    def test_event_usage_is_cached(self, mock_method):
+        organization, team, user = self.create_org_team_user()
+        self.client.force_login(user)
 
-    #     # Org has no events, but cached result is used
-    #     cache.set(f"monthly_usage_{organization.id}", 4831, 10)
+        # Org has no events, but cached result is used
+        cache.set(f"monthly_usage_{organization.id}", 4831, 10)
 
-    #     response = self.client.post("/api/user/")
-    #     self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    #     # Assert that the uncached method was not called
-    #     mock_method.assert_not_called()
+        # Assert that the uncached method was not called
+        mock_method.assert_not_called()
 
-    #     response_data: Dict = response.json()
-    #     self.assertEqual(
-    #         response_data["billing"],
-    #         {"plan": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
-    #     )
+        response_data: Dict = response.json()
+        self.assertEqual(
+            response_data["billing"],
+            {"plan": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
+        )
 
-    # TODO:
-    # @freeze_time("2018-12-31T22:59:59.000000Z")
-    # def test_event_usage_cache_is_reset_at_beginning_of_month(self):
-    #     organization, team, user = self.create_org_team_user()
-    #     self.client.force_login(user)
+    @freeze_time("2018-12-31T22:59:59.000000Z")
+    def test_event_usage_cache_is_reset_at_beginning_of_month(self):
+        organization, team, user = self.create_org_team_user()
+        self.client.force_login(user)
 
-    #     for _ in range(0, 3):
-    #         Event.objects.create(team=team)
+        for _ in range(0, 3):
+            # Create some events on CH
+            create_event(
+                team=team,
+                event="$pageview",
+                distinct_id="distinct_id",
+                event_uuid=uuid.uuid4(),
+            )
 
-    #     response = self.client.post("/api/user/")
-    #     self.assertEqual(response.status_code, status.HTTP_200_OK)
-    #     self.assertEqual(response.json()["billing"]["current_usage"]["value"], 3)
+        response = self.client.post("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["billing"]["current_usage"]["value"], 3)
 
-    #     # Check that result was cached
-    #     cache_key = f"monthly_usage_{organization.id}"
-    #     self.assertEqual(cache.get(cache_key), 3)
+        # Check that result was cached
+        cache_key = f"monthly_usage_{organization.id}"
+        self.assertEqual(cache.get(cache_key), 3)
 
-    #     # Even though default caching time is 12 hours, the result is only cached until beginning of next month
-    #     self.assertEqual(
-    #         cache._expire_info.get(cache.make_key(cache_key)), 1546300800.0,
-    #     )  # 1546300800 = Jan 1, 2019 00:00 UTC
+        # Even though default caching time is 12 hours, the result is only cached until beginning of next month
+        self.assertEqual(
+            cache._expire_info.get(cache.make_key(cache_key)), 1546300800.0,
+        )  # 1546300800 = Jan 1, 2019 00:00 UTC
 
     # Manage billing
 

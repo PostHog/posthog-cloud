@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.utils import timezone
 from ee.clickhouse.client import sync_execute
-from posthog.models import Event, Organization
+from posthog.models import Organization, Team
 
 EVENT_CACHING_EXPIRY: int = 12 * 60 * 60  # 12 hours
 
@@ -37,12 +37,13 @@ def get_monthly_event_usage(
         {
             "date_from": start_date.strftime("%Y-%m-%d %H:%M:%S"),
             "date_to": end_date.strftime("%Y-%m-%d %H:%M:%S"),
-            "team_ids": organization.teams.values_list("id", flat=True),
+            "team_ids": list(
+                Team.objects.filter(organization=organization).values_list(
+                    "id", flat=True,
+                ),
+            ),
         },
     )
-
-    print(organization.teams.values_list("id", flat=True))
-    print(result)
 
     return result[0][0]
 
