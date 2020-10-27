@@ -5,9 +5,82 @@ on:
 
 jobs:
   django:
-    name: Django tests
+    name: Origin repository tests
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      clickhouse-server:
+        image: yandex/clickhouse-server
+        ports:
+          - "8123:8123"
+          - "9000:9000"
+          - "9440:9440"
+          - "9009:9009"
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+
+      - name: Fetch posthog main repo
+        run: bin/pull_main
+
+      - name: Set up dependencies caching
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/requirements/*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          cd deploy
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install freezegun
+        if: steps.cache.outputs.cache-hit != 'true'
+
+      - name: Run posthog tests
+        env:
+          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
+          DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
+          REDIS_URL: "redis://localhost"
+        run: |
+          cd deploy
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
+          touch frontend/dist/layout.html
+          touch frontend/dist/shared_dashboard.html
+          python manage.py test posthog -v 2 --exclude-tag=skip_on_multitenancy
+
+      - name: Run EE tests
+        env:
+          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
+          DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
+          PRIMARY_DB: "clickhouse"
+          CLICKHOUSE_HOST: "localhost"
+          CLICKHOUSE_DATABASE: "posthog_test"
+          CLICKHOUSE_SECURE: "False"
+          CLICKHOUSE_VERIFY: "False"
+        run: |
+          cd deploy
+          python manage.py test ee
+
+  cloud:
+    name: Local tests
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:12
@@ -72,38 +145,9 @@ jobs:
           CLICKHOUSE_SECURE: "False"
           CLICKHOUSE_VERIFY: "False"
         run: |
-          source .env.template
           cd deploy
           mkdir -p frontend/dist
           touch frontend/dist/index.html
           touch frontend/dist/layout.html
           touch frontend/dist/shared_dashboard.html
           python manage.py test multi_tenancy messaging -v 2 --exclude-tag=skip_on_multitenancy
-
-      - name: Run main app tests
-        env:
-          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
-          DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
-          REDIS_URL: "redis://localhost"
-        run: |
-          source .env.template
-          cd deploy
-          mkdir -p frontend/dist
-          touch frontend/dist/index.html
-          touch frontend/dist/layout.html
-          touch frontend/dist/shared_dashboard.html
-          python manage.py test posthog -v 2 --exclude-tag=skip_on_multitenancy
-
-      - name: Run EE tests
-        env:
-          SECRET_KEY: "6b01eee4f945ca25045b5aab440b953461faf08693a9abbf1166dc7c6b9772da" # unsafe - for testing only
-          DATABASE_URL: "postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres"
-          PRIMARY_DB: "clickhouse"
-          CLICKHOUSE_HOST: "localhost"
-          CLICKHOUSE_DATABASE: "posthog_test"
-          CLICKHOUSE_SECURE: "False"
-          CLICKHOUSE_VERIFY: "False"
-        run: |
-          source .env.template
-          cd deploy
-          python manage.py test ee
