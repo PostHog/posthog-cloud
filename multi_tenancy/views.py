@@ -70,13 +70,13 @@ def user_with_billing(request: HttpRequest):
         )
 
         output = json.loads(response.content)
-        event_usage: int = get_cached_monthly_event_usage(request.user.organization)
+        # TODO: event_usage: int = get_cached_monthly_event_usage(request.user.organization)
         output["billing"] = {
             "plan": None,
-            "current_usage": {
-                "value": event_usage,
-                "formatted": compact_number(event_usage),
-            },
+            # "current_usage": {
+            #    "value": event_usage,
+            #    "formatted": compact_number(event_usage),
+            # },
         }
 
         if instance.plan:

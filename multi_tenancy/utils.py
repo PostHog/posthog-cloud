@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from posthog.models import Event, Organization
 
-EVENT_CACHING_EXPIRY: int = 43_200  # 12 hours
+EVENT_CACHING_EXPIRY: int = 12 * 60 * 60  # 12 hours
 
 
 def get_monthly_event_usage(
@@ -17,8 +17,6 @@ def get_monthly_event_usage(
     """
     Returns the number of events used in the calendar month (UTC) of the date provided for all
     teams of the organization. Intended mainly for billing purposes.
-    Example: instance.get_monthly_event_usage()
-        => 584127
     """
     if not at_date:
         at_date = timezone.now()
