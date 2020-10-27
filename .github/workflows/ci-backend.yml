@@ -73,7 +73,7 @@ jobs:
           touch frontend/dist/index.html
           touch frontend/dist/layout.html
           touch frontend/dist/shared_dashboard.html
-          python manage.py test posthog ee multi_tenancy messaging -v 2 --exclude-tag=skip_on_multitenancy
+          python manage.py test posthog multi_tenancy messaging -v 2 --exclude-tag=skip_on_multitenancy
 
       - name: Run EE tests
         env:
