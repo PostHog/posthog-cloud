@@ -5,7 +5,7 @@ on:
 
 jobs:
   django:
-    name: Origin repository tests
+    name: Main repository tests
     runs-on: ubuntu-latest
 
     services:
@@ -79,7 +79,7 @@ jobs:
           python manage.py test ee
 
   cloud:
-    name: Local tests
+    name: Local repository tests
     runs-on: ubuntu-latest
     services:
       postgres:
