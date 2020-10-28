@@ -1,4 +1,4 @@
-# These settings get copied by bin/pull_main into the end of settings.py of the main PostHog code base.
+# These settings get copied by bin/pull_main or bin/develop into the end of settings.py of the main PostHog code base.
 
 MULTI_TENANCY = os.environ.get("MULTI_TENANCY", True)
 
@@ -17,6 +17,9 @@ if (
 ):
 
     TEMPLATES[0]["DIRS"].insert(0, "multi_tenancy/templates")
+
+
+EVENT_USAGE_CACHING_TTL = int(os.environ.get("EVENT_USAGE_CACHING_TTL", 12 * 60 * 60))
 
 
 # Stripe settings

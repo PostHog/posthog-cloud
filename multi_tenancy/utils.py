@@ -4,12 +4,13 @@ from typing import Tuple
 
 import pytz
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from ee.clickhouse.client import sync_execute
 from posthog.models import Organization, Team
 
-EVENT_CACHING_EXPIRY: int = 12 * 60 * 60  # 12 hours
+EVENT_USAGE_CACHING_TTL: int = settings.EVENT_USAGE_CACHING_TTL
 
 
 def get_monthly_event_usage(
@@ -76,7 +77,7 @@ def get_cached_monthly_event_usage(organization: Organization) -> int:
         cache_key,
         result,
         min(
-            EVENT_CACHING_EXPIRY,
+            EVENT_USAGE_CACHING_TTL,
             (start_of_next_month - timezone.now()).total_seconds(),
         ),
     )  # cache result for default time or until next month
