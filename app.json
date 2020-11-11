@@ -11,25 +11,17 @@
       "env": {
         "DEBUG": true
       },
-      "buildpacks": [
-        {"url": "heroku/nodejs"},
-        {"url": "https://github.com/timgl/heroku-buildpack-python.git"}
-      ]
+      "buildpacks": [{ "url": "heroku/nodejs" }, { "url": "heroku/python" }]
     },
     "test": {
       "addons": ["heroku-postgresql:in-dyno"],
       "scripts": {
         "test": "python manage.py test --keepdb -v 2"
       },
-      "buildpacks": [
-        {"url": "https://github.com/timgl/heroku-buildpack-python.git"}
-      ]
+      "buildpacks": [{ "url": "heroku/python" }]
     }
   },
-  "buildpacks": [
-        {"url": "heroku/nodejs"},
-        {"url": "https://github.com/timgl/heroku-buildpack-python.git"}
-  ],
+  "buildpacks": [{ "url": "heroku/nodejs" }, { "url": "heroku/python" }],
   "addons": [
       "heroku-postgresql"
   ],
