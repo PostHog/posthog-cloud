@@ -6,3 +6,4 @@ env
 .vscode/*
 .idea/
 .mypy_cache/
+.python-version

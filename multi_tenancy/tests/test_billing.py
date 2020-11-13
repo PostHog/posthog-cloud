@@ -60,7 +60,72 @@ class PlanTestMixin:
         )
 
 
-class TestOrganizationBilling(TransactionBaseTest, PlanTestMixin):
+class TestOrganizationBilling(BaseTest, PlanTestMixin):
+    def test_plan_key_method(self):
+        plan = self.create_plan()
+        organization, _, _ = self.create_org_team_user()
+
+        billing = OrganizationBilling.objects.create(
+            organization=organization, should_setup_billing=True,
+        )
+
+        # No plan
+        self.assertEqual(billing.get_plan_key(), None)
+
+        # Plan but subscription is not active
+        billing.plan = plan
+        billing.save()
+        self.assertEqual(billing.get_plan_key(), None)
+
+        # Plan but subscription is expired
+        billing.billing_period_ends = timezone.now() - datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertEqual(billing.get_plan_key(), None)
+
+        # Active plan
+        billing.billing_period_ends = timezone.now() + datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertEqual(billing.get_plan_key(), plan.key)
+
+    def test_available_features(self):
+        plan = self.create_plan(key="starter")
+        organization, _, _ = self.create_org_team_user()
+
+        # No plan
+        billing = OrganizationBilling.objects.create(organization=organization,)
+        self.assertEqual(billing.available_features, [])
+
+        # Inactive plan
+        billing.plan = plan
+        billing.save()
+        self.assertEqual(billing.available_features, [])
+
+        # Expired plan
+        billing.billing_period_ends = timezone.now() - datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertEqual(billing.available_features, [])
+
+        # Active plan (starter)
+        billing.billing_period_ends = timezone.now() + datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertEqual(billing.available_features, ["organizations_projects"])
+
+        # Startup plan
+        plan.key = "startup"
+        plan.save()
+        self.assertEqual(
+            billing.available_features, ["zapier", "organizations_projects"]
+        )
+
+        # Growth plan
+        plan.key = "growth"
+        plan.save()
+        self.assertEqual(
+            billing.available_features, ["zapier", "organizations_projects"]
+        )
+
+
+class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
     TESTS_API = True
 

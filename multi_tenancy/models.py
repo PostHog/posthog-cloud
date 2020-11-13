@@ -1,10 +1,16 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, Team
 
 from .stripe import create_subscription, create_zero_auth
+
+PLANS = {
+    "starter": ["organizations_projects"],
+    "growth": ["zapier", "organizations_projects"],
+    "startup": ["zapier", "organizations_projects"],
+}
 
 
 class Plan(models.Model):
@@ -112,8 +118,23 @@ class OrganizationBilling(models.Model):
     def is_billing_active(self) -> bool:
         return self.billing_period_ends and self.billing_period_ends > timezone.now()
 
-    def get_plan_key(self) -> str:
+    def get_plan_key(self, only_active: bool = True) -> Optional[str]:
+        """
+        Returns the key of the current plan. If `only_active` it will only return the plan information if billing
+        is active.
+        """
+        if only_active and not self.is_billing_active:
+            return None
         return self.plan.key if self.plan else None
 
     def get_price_id(self) -> str:
         return self.plan.price_id if self.plan else ""
+
+    @property
+    def available_features(self) -> List[str]:
+        plan_key = self.get_plan_key()
+
+        if plan_key and plan_key in PLANS:
+            return PLANS[plan_key]
+
+        return []
