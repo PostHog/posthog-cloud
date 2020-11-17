@@ -38,4 +38,4 @@ EXPOSE 8000
 EXPOSE 8234
 RUN yarn install
 RUN yarn build
-CMD ["./gunicorn posthog.wsgi --log-file -"]
+CMD ["./bin/docker-worker"]
