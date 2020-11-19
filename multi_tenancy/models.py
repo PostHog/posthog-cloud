@@ -59,6 +59,9 @@ class Plan(models.Model):
             customer_id=team_billing.stripe_customer_id,
         )
 
+    def __str__(self) -> str:
+        return self.name
+
 
 class TeamBilling(models.Model):
     """DEPRECATED: Organization is now the root entity, so TeamBilling has been replaced with OrganizationBilling."""
