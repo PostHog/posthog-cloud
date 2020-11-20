@@ -31,7 +31,6 @@ COPY ./messaging /code/messaging/
 COPY multi_tenancy_settings.py /code/cloud_settings.py
 RUN cat /code/cloud_settings.py >> /code/posthog/settings.py
 
-
 RUN DATABASE_URL='postgres:///' REDIS_URL='redis:///' SECRET_KEY='no' python manage.py collectstatic --noinput
 
 EXPOSE 8000
