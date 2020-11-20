@@ -34,8 +34,7 @@ RUN cat /code/cloud_settings.py >> /code/posthog/settings.py
 
 RUN DATABASE_URL='postgres:///' REDIS_URL='redis:///' SECRET_KEY='no' python manage.py collectstatic --noinput
 
-EXPOSE 8000
-EXPOSE 8234
+EXPOSE 8000-8001
 RUN yarn install
 RUN yarn build
 CMD ["./gunicorn posthog.wsgi --log-file -"]
