@@ -70,7 +70,12 @@ def user_with_billing(request: HttpRequest):
         )
 
         output = json.loads(response.content)
-        event_usage: int = get_cached_monthly_event_usage(request.user.organization)
+        try:
+            # Function calls clickhouse so make sure Clickhouse failure doesn't block api/user from loading
+            event_usage: int = get_cached_monthly_event_usage(request.user.organization)
+        except Exception as e:
+            capture_exception(e)
+            event_usage: int = 0
         output["billing"] = {
             "plan": None,
             "current_usage": {
