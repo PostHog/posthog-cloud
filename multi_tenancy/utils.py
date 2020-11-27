@@ -1,6 +1,6 @@
 import calendar
 import datetime
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pytz
 from dateutil.relativedelta import relativedelta
