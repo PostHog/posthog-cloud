@@ -64,25 +64,28 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200:
-        # TODO: Handle multiple organizations
         instance, _created = OrganizationBilling.objects.get_or_create(
             organization=request.user.organization,
         )
 
         output = json.loads(response.content)
-        try:
-            # Function calls clickhouse so make sure Clickhouse failure doesn't block api/user from loading
-            event_usage: int = get_cached_monthly_event_usage(request.user.organization)
-        except Exception as e:
-            capture_exception(e)
-            event_usage: int = 0
         output["billing"] = {
             "plan": None,
-            "current_usage": {
+        }
+
+        # Obtain event usage of current organization
+        event_usage: Optional[int] = None
+        try:
+            # Function calls clickhouse so make sure Clickhouse failure doesn't block api/user from loading
+            event_usage = get_cached_monthly_event_usage(request.user.organization)
+        except Exception as e:
+            capture_exception(e)
+
+        if event_usage:
+            output["billing"]["current_usage"] = {
                 "value": event_usage,
                 "formatted": compact_number(event_usage),
-            },
-        }
+            }
 
         if instance.plan:
             plan_serializer = PlanSerializer()
