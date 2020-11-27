@@ -15,7 +15,7 @@ EVENT_USAGE_CACHING_TTL: int = settings.EVENT_USAGE_CACHING_TTL
 
 def get_monthly_event_usage(
     organization: Organization, at_date: datetime.datetime = None,
-) -> int:
+) -> Optional[int]:
     """
     Returns the number of events used in the calendar month (UTC) of the date provided for all
     teams of the organization. Intended mainly for billing purposes.
@@ -49,12 +49,10 @@ def get_monthly_event_usage(
     if result:
         return result[0][0]
 
-    return (
-        -1
-    )  # use -1 to distinguish from an actual 0 in case CH is not available (mainly to run posthog tests)
+    return None  # in case CH is not available (mainly to run posthog tests)
 
 
-def get_cached_monthly_event_usage(organization: Organization) -> int:
+def get_cached_monthly_event_usage(organization: Organization) -> Optional[int]:
     """
     Returns the cached number of events used in the current calendar month. Results will be cached for 12 hours.
     """
@@ -67,6 +65,10 @@ def get_cached_monthly_event_usage(organization: Organization) -> int:
 
     now: datetime.datetime = timezone.now()
     result: int = get_monthly_event_usage(organization=organization, at_date=now)
+
+    if not result:
+        # Don't cache unavilable result
+        return result
 
     # Cache the result
     start_of_next_month = datetime.datetime.combine(
