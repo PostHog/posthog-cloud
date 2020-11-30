@@ -15,7 +15,7 @@ cat "$(pwd)"/multi_tenancy_settings.py >> "$(pwd)"/deploy/posthog/settings.py
 cat "$(pwd)"/requirements.txt >> "$(pwd)"/deploy/requirements.txt
 
 cd deploy
-pip install -r requirements/dev.txt
+pip install -r requirements-dev.txt
 echo
 pip install -r requirements.txt
 echo
