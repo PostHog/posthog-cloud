@@ -124,6 +124,24 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
             billing.available_features, ["zapier", "organizations_projects"]
         )
 
+    def test_feature_available_multi_tenancy(self):
+        organization, _, _ = self.create_org_team_user()
+        plan = self.create_plan(key="starter")
+        billing = OrganizationBilling.objects.create(
+            organization=organization, plan=plan
+        )
+
+        # Inactive billing period
+        self.assertFalse(organization.is_feature_available("organizations_projects"))
+
+        # Active plan
+        billing.billing_period_ends = timezone.now() + datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertTrue(organization.is_feature_available("organizations_projects"))
+
+        # Unavailable feature
+        self.assertFalse(organization.is_feature_available("zapier"))
+
 
 class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 

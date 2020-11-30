@@ -22,11 +22,8 @@ from sentry_sdk import capture_exception, capture_message
 import stripe
 
 from .models import OrganizationBilling, Plan
-from .serializers import (
-    BillingSubscribeSerializer,
-    MultiTenancyOrgSignupSerializer,
-    PlanSerializer,
-)
+from .serializers import (BillingSubscribeSerializer,
+                          MultiTenancyOrgSignupSerializer, PlanSerializer)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -81,7 +78,7 @@ def user_with_billing(request: HttpRequest):
         except Exception as e:
             capture_exception(e)
 
-        if event_usage:
+        if event_usage is not None:
             output["billing"]["current_usage"] = {
                 "value": event_usage,
                 "formatted": compact_number(event_usage),

@@ -60,14 +60,14 @@ def get_cached_monthly_event_usage(organization: Organization) -> Optional[int]:
     cache_key: str = f"monthly_usage_{organization.id}"
     cached_result: int = cache.get(cache_key)
 
-    if cached_result:
+    if cached_result is not None:
         return cached_result
 
     now: datetime.datetime = timezone.now()
     result: int = get_monthly_event_usage(organization=organization, at_date=now)
 
-    if not result:
-        # Don't cache unavilable result
+    if result is None:
+        # Don't cache unavailable/error result
         return result
 
     # Cache the result
