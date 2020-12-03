@@ -1,5 +1,5 @@
 FROM python:3.8-slim
-EXPOSE 8000-8001
+EXPOSE 8000
 ENV PYTHONUNBUFFERED 1
 RUN mkdir /code
 WORKDIR /code
@@ -13,8 +13,10 @@ RUN apt-get update \
     && yarn config set network-timeout 300000 \
     && yarn --frozen-lockfile
 
-# fetch main posthog from Github
-RUN curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C . --
+
+# RUN curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C . --
+# Grab posthog from local
+COPY ./deploy .
 
 # add local dependencies
 COPY requirements.txt /code/cloud_requirements.txt
