@@ -14,7 +14,6 @@ RUN apt-get update \
     && yarn --frozen-lockfile
 
 
-# RUN curl -L https://github.com/posthog/posthog/tarball/master | tar --strip-components=1 -xz -C . --
 # Grab posthog from local
 COPY ./deploy .
 
