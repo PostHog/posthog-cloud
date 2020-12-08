@@ -102,10 +102,8 @@ def user_with_billing(request: HttpRequest):
                         (
                             checkout_session,
                             customer_id,
-                        ) = instance.plan.create_checkout_session(
-                            user=request.user,
-                            team_billing=instance,
-                            base_url=request.build_absolute_uri("/"),
+                        ) = instance.create_checkout_session(
+                            user=request.user, base_url=request.build_absolute_uri("/"),
                         )
                     except ImproperlyConfigured as e:
                         capture_exception(e)
@@ -162,15 +160,19 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            team_billing = OrganizationBilling.objects.get(
+            organizastion_billing = OrganizationBilling.objects.get(
                 stripe_checkout_session=session_id,
             )
         except OrganizationBilling.DoesNotExist:
             pass
         else:
             serializer = PlanSerializer()
-            extra_args["plan"] = serializer.to_representation(team_billing.plan)
-            extra_args["billing_period_ends"] = team_billing.billing_period_ends
+            extra_args["plan"] = serializer.to_representation(
+                organizastion_billing.plan
+            )
+            extra_args[
+                "billing_period_ends"
+            ] = organizastion_billing.billing_period_ends
 
     return render_template("billing-welcome.html", request, extra_args)
 
@@ -213,12 +215,28 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             # Stripe sets period_end = period_start because they manage these attributes on an accrual-basis
             line_items = event["data"]["object"]["lines"]["data"]
             if len(line_items) > 1:
+                # This is unexpected behavior, while the code will continue by using only the first item, this is logged
+                # to be properly addressed.
                 capture_message(
-                    f"Stripe's invoice.payment_succeeded webhook contained more than 1 line item ({event}), "
-                    "using the first one.",
+                    f"Stripe's invoice.payment_succeeded webhook contained more than 1 line item: {json.dumps(event)}"
+                    "warning",
                 )
 
-            # TODO: Validate plan in case it has changed outside the scope of posthog-production
+            if instance.stripe_subscription_item_id:
+                if (
+                    instance.stripe_subscription_item_id
+                    != line_items[0]["subscription_item"]
+                ):
+                    capture_message(
+                        "Stripe webhook does not match subscription on file "
+                        f"({instance.stripe_subscription_id}): {json.dumps(event)}",
+                        "error",
+                    )
+                    return error_response
+            else:
+                # First time receiving the subscription_item ID, record it
+                instance.stripe_subscription_id = line_items[0]["subscription_item"]
+
             instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
                 line_items[0]["period"]["end"],
             ).replace(tzinfo=pytz.utc)
@@ -226,12 +244,9 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
 
             instance.save()
 
-        # Special handling for plans that only do card validation (e.g. startup);
-        # default behavior is setting the plan for 1 year from registration.
+        # Special handling for plans that only do card validation (e.g. startup or metered-billing plans)
         elif event["type"] == "payment_intent.amount_capturable_updated":
-            instance.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
-            instance.should_setup_billing = False
-            instance.save()
+            instance.handle_post_card_validation()
 
             # Attempt to cancel the validation charge
             try:

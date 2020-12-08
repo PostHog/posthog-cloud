@@ -94,13 +94,11 @@ class BillingSubscribeSerializer(serializers.Serializer):
                 "Your organization already has billing set up, please contact us to change.",
             )
 
+        instance.plan = validated_data["plan"]
+
         try:
-            (checkout_session, customer_id) = validated_data[
-                "plan"
-            ].create_checkout_session(
-                user=user,
-                team_billing=instance,
-                base_url=self.context["request"].build_absolute_uri("/"),
+            (checkout_session, customer_id) = instance.create_checkout_session(
+                user=user, base_url=self.context["request"].build_absolute_uri("/"),
             )
         except ImproperlyConfigured as e:
             capture_exception(e)
@@ -111,7 +109,6 @@ class BillingSubscribeSerializer(serializers.Serializer):
                 "Error starting your billing subscription. Please try again.",
             )
 
-        instance.plan = validated_data["plan"]
         instance.stripe_customer_id = customer_id
         instance.stripe_checkout_session = checkout_session
         instance.checkout_session_created_at = timezone.now()
