@@ -94,6 +94,10 @@ def get_billing_cycle_anchor(
     after_trial_date = at_date + datetime.timedelta(days=settings.BILLING_TRIAL_DAYS)
     if after_trial_date.day <= 2:
         # Billing anchor should be this month
-        return after_trial_date.replace(day=2)
+        return datetime.datetime.combine(
+            after_trial_date.replace(day=2), datetime.time.max
+        )
     # Billing anchor is next month
-    return (after_trial_date + relativedelta(months=+1)).replace(day=2)
+    return datetime.datetime.combine(
+        (after_trial_date + relativedelta(months=+1)).replace(day=2), datetime.time.max
+    )

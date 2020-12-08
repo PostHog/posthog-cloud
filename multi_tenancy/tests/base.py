@@ -34,8 +34,8 @@ class UtilsTest(TestCase):
 
         with freeze_time("2020-01-1"):
             self.assertEqual(
-                get_billing_cycle_anchor(timezone.now()).strftime("%Y-%m-%d"),
-                "2020-01-02",
+                get_billing_cycle_anchor(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S"),
+                "2020-01-02T23:59:59",
             )
 
         with freeze_time("2020-01-02"):
@@ -58,6 +58,6 @@ class UtilsTest(TestCase):
 
         with freeze_time("2020-01-31"):
             self.assertEqual(
-                get_billing_cycle_anchor(timezone.now()).strftime("%Y-%m-%d"),
-                "2020-02-02",
+                get_billing_cycle_anchor(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S"),
+                "2020-02-02T23:59:59",
             )
