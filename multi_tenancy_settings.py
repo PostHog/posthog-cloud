@@ -28,3 +28,9 @@ EVENT_USAGE_CACHING_TTL = int(os.environ.get("EVENT_USAGE_CACHING_TTL", 12 * 60 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+
+# Business rules
+# https://github.com/posthog/posthog-production
+
+BILLING_TRIAL_DAYS = os.environ.get("BILLING_TRIAL_DAYS", 0)

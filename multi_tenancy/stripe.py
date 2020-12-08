@@ -3,8 +3,10 @@ from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 
 import stripe
+from multi_tenancy.utils import get_billing_cycle_anchor
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,28 @@ def create_zero_auth(
     session = stripe.checkout.Session.create(**payload)
 
     return (session.id, customer_id)
+
+
+def create_subscription(price_id: str = "", customer_id: str = "",) -> Tuple[str, str]:
+    """
+    Creates a subscription for an existing customer with payment details already set up. Used mainly for metered
+    plans.
+    """
+
+    customer_id = _get_customer_id(
+        customer_id
+    )  # we don't pass the email because the customer is always created before (on zero auth)
+
+    subscription = stripe.Subscription.create(
+        customer=customer_id,
+        items=[{"price": price_id}],
+        trial_period_days=settings.BILLING_TRIAL_DAYS,
+        billing_cycle_anchor=get_billing_cycle_anchor(timezone.now()),
+    )
+
+    subscription_data = subscription.to_dict()
+
+    return (subscription_data["items"]["data"][0]["id"], customer_id)
 
 
 def cancel_payment_intent(payment_intent_id: str) -> None:

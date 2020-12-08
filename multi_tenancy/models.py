@@ -6,7 +6,11 @@ from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
 
-from .stripe import create_subscription_checkout_session, create_zero_auth
+from .stripe import (
+    create_subscription,
+    create_subscription_checkout_session,
+    create_zero_auth,
+)
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -135,10 +139,13 @@ class OrganizationBilling(models.Model):
         if self.plan.key == "startup":
             self.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
             self.should_setup_billing = False
-            self.save()
         elif self.plan.is_metered_billing:
-            # TODO: Create subscription async
-            pass
+            subscription_id, _ = create_subscription(
+                price_id=self.plan.price_id, customer_id=self.stripe_customer_id,
+            )
+            self.stripe_subscription_item_id = subscription_id
+            self.should_setup_billing = False
+        self.save()
 
 
 class MonthlyBillingRecord(models.Model):
