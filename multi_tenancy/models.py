@@ -133,9 +133,7 @@ class OrganizationBilling(models.Model):
         Handles logic after a card has been validated.
         """
         if self.plan.key == "startup":
-            self.billing_period_ends = timezone.now() + datetime.timedelta(
-                days=365
-            )
+            self.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
             self.should_setup_billing = False
             self.save()
         elif self.plan.is_metered_billing:
@@ -163,3 +161,7 @@ class MonthlyBillingRecord(models.Model):
 
     class Meta:
         unique_together = ("organization_billing", "billing_period")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
