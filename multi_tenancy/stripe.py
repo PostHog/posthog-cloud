@@ -25,9 +25,12 @@ def _get_customer_id(customer_id: str, email: str = "") -> str:
     return stripe.Customer.create(email=email).id
 
 
-def create_subscription(
+def create_subscription_checkout_session(
     email: str, base_url: str, price_id: str = "", customer_id: str = "",
 ) -> Tuple[str, str]:
+    """
+    Creates a checkout session for a billing subscription (used by flat-fee recurring subscriptions)
+    """
 
     customer_id = _get_customer_id(customer_id, email)
 

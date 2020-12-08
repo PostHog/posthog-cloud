@@ -6,7 +6,7 @@ from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
 
-from .stripe import create_subscription, create_zero_auth
+from .stripe import create_subscription_checkout_session, create_zero_auth
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -121,7 +121,7 @@ class OrganizationBilling(models.Model):
                 customer_id=self.stripe_customer_id,
             )
 
-        return create_subscription(
+        return create_subscription_checkout_session(
             email=user.email,
             base_url=base_url,
             price_id=self.plan.price_id,
