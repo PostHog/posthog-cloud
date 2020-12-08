@@ -11,7 +11,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from posthog.api.team import TeamSignupViewset
+from posthog.api.organization import OrganizationSignupViewset
 from posthog.api.user import user
 from posthog.templatetags.posthog_filters import compact_number
 from posthog.urls import render_template
@@ -22,15 +22,18 @@ from sentry_sdk import capture_exception, capture_message
 import stripe
 
 from .models import OrganizationBilling, Plan
-from .serializers import (BillingSubscribeSerializer,
-                          MultiTenancyOrgSignupSerializer, PlanSerializer)
+from .serializers import (
+    BillingSubscribeSerializer,
+    MultiTenancyOrgSignupSerializer,
+    PlanSerializer,
+)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
 logger = logging.getLogger(__name__)
 
 
-class MultiTenancyOrgSignupViewset(TeamSignupViewset):
+class MultiTenancyOrgSignupViewset(OrganizationSignupViewset):
     serializer_class = MultiTenancyOrgSignupSerializer
 
 
