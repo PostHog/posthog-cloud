@@ -113,14 +113,15 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
                 content_type="text/plain",
                 HTTP_STRIPE_SIGNATURE=signature,
             )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check that the period end was updated
+        # Check that the period end was updated and subscription ID saved
         instance.refresh_from_db()
         self.assertEqual(
             instance.billing_period_ends,
             timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
         )
+        self.assertEqual(instance.stripe_subscription_item_id, "si_HbSpBTL6hI03Lp")
 
     @patch("multi_tenancy.views.cancel_payment_intent")
     def test_billing_period_special_handling_for_startup_plan(
@@ -205,6 +206,9 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
             ).total_seconds(),
             2,
         )
+        self.assertEqual(
+            instance.stripe_subscription_item_id, ""
+        )  # this is not updated as there's no Stripe subscription on startup plan
 
         # Check that the payment is cancelled (i.e. not captured)
         cancel_payment_intent.assert_called_once_with("pi_TxLb1HS1CyhnDR")
@@ -212,6 +216,163 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
     def test_handle_webhook_for_metered_plans_after_card_registration(self):
         # TODO
         pass
+
+    @patch("multi_tenancy.views.capture_message")
+    def test_initial_webhook_with_more_than_one_subscription_item(
+        self, capture_message
+    ):
+        """
+        Tests behavior of receiving webhook with more than one subscription items where the
+        stored stripe_subscription_item_id has not been set (i.e. initial webhook).
+        Expected behavior: the first subscription item is used and a warning is raised on Sentry.
+        """
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+
+        organization, team, user = self.create_org_team_user()
+        instance = OrganizationBilling.objects.create(
+            organization=organization,
+            should_setup_billing=True,
+            stripe_customer_id="cus_111dEDNOcmq",
+        )
+
+        body: str = """
+        {
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "customer": "cus_111dEDNOcmq",
+                    "lines": {
+                        "object": "list",
+                        "data": [
+                            {
+                                "subscription_item": "si_01234567890",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                }
+                            },
+                            {
+                                "subscription_item": "si_abcdefghi",
+                                "period": {
+                                    "end": 1206803292,
+                                    "start": 1594124895
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the period end was updated and subscription ID saved
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.billing_period_ends,
+            timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC),
+        )
+        self.assertEqual(instance.stripe_subscription_item_id, "si_01234567890")
+
+        capture_message.assert_called_once()
+        self.assertIn(
+            "Stripe invoice.payment_succeeded webhook contained more than 1 item",
+            capture_message.call_args[0][0],
+        )
+        self.assertEqual(capture_message.call_args[0][1], "warning")
+
+    @patch("multi_tenancy.views.capture_message")
+    def test_webhook_with_more_than_one_subscription_item_and_matching_id_is_found(
+        self, capture_message
+    ):
+        """
+        Tests behavior of receiving webhook with more than one subscription items where the
+        stored stripe_subscription_item_id has been set, and one of the items **does** match the subscription on file.
+        """
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+
+        organization, team, user = self.create_org_team_user()
+        instance = OrganizationBilling.objects.create(
+            organization=organization,
+            should_setup_billing=True,
+            stripe_customer_id="cus_111dEDNOcmq",
+            stripe_subscription_item_id="si_abcdefghi",
+        )
+
+        body: str = """
+        {
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "customer": "cus_111dEDNOcmq",
+                    "lines": {
+                        "object": "list",
+                        "data": [
+                            {
+                                "subscription_item": "si_01234567890",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                }
+                            },
+                            {
+                                "subscription_item": "si_abcdefghi",
+                                "period": {
+                                    "end": 1607453607,
+                                    "start": 1594124895
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+
+        csrf_client = Client(
+            enforce_csrf_checks=True,
+        )  # Custom client to ensure CSRF checks pass
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the period end was updated and subscription ID saved
+        instance.refresh_from_db()
+        self.assertEqual(
+            instance.billing_period_ends,
+            timezone.datetime(2020, 12, 8, 18, 53, 27, tzinfo=pytz.UTC),
+        )
+        self.assertEqual(
+            instance.stripe_subscription_item_id, "si_abcdefghi"
+        )  # Subscription ID does not change
+
+        capture_message.assert_not_called()  # No exceptions/messages are logged
 
     @patch("multi_tenancy.views.capture_exception")
     def test_webhook_with_invalid_signature_fails(self, capture_exception):
@@ -366,3 +527,66 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
             "Received invoice.payment_succeeded for cus_12345678 but customer is not in the database.",
         )
 
+    @patch("multi_tenancy.views.capture_message")
+    def test_webhook_with_no_matching_subscription_item(self, capture_message):
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+
+        organization, team, user = self.create_org_team_user()
+        OrganizationBilling.objects.create(
+            organization=organization,
+            should_setup_billing=True,
+            stripe_customer_id="cus_111dEDNOHbSpxHcmq",
+            stripe_subscription_item_id="si_1234567890",
+        )
+
+        body: str = """
+        {
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "customer": "cus_111dEDNOHbSpxHcmq",
+                    "lines": {
+                        "object": "list",
+                        "data": [
+                            {
+                                "subscription_item": "invalid",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                }
+                            },
+                            {
+                                "subscription_item": "invalid2",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = self.client.post(
+                "/billing/stripe_webhook",
+                body,
+                content_type="text/plain",
+                HTTP_STRIPE_SIGNATURE=signature,
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {"success": False})
+
+        capture_message.assert_called_once()
+        self.assertIn(
+            "Stripe webhook does not match subscription on file",
+            capture_message.call_args[0][0],
+        )
+        self.assertEqual(capture_message.call_args[0][1], "error")

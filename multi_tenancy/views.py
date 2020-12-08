@@ -214,31 +214,38 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             # We have to use the period from the invoice line items because on the first month
             # Stripe sets period_end = period_start because they manage these attributes on an accrual-basis
             line_items = event["data"]["object"]["lines"]["data"]
-            if len(line_items) > 1:
-                # This is unexpected behavior, while the code will continue by using only the first item, this is logged
-                # to be properly addressed.
-                capture_message(
-                    f"Stripe's invoice.payment_succeeded webhook contained more than 1 line item: {json.dumps(event)}"
-                    "warning",
-                )
+            line_item = None
 
             if instance.stripe_subscription_item_id:
-                if (
-                    instance.stripe_subscription_item_id
-                    != line_items[0]["subscription_item"]
-                ):
+                for _item in line_items:
+                    if (
+                        instance.stripe_subscription_item_id
+                        == _item["subscription_item"]
+                    ):
+                        line_item = _item
+
+                if line_item is None:
                     capture_message(
                         "Stripe webhook does not match subscription on file "
-                        f"({instance.stripe_subscription_id}): {json.dumps(event)}",
+                        f"({instance.stripe_subscription_item_id}): {json.dumps(event)}",
                         "error",
                     )
                     return error_response
             else:
+                if len(line_items) > 1:
+                    # This is unexpected behavior, while the code will continue by using only the first item,
+                    # this is logged to be properly addressed.
+                    capture_message(
+                        f"Stripe invoice.payment_succeeded webhook contained more than 1 item: {json.dumps(event)}",
+                        "warning",
+                    )
+
                 # First time receiving the subscription_item ID, record it
-                instance.stripe_subscription_id = line_items[0]["subscription_item"]
+                line_item = line_items[0]
+                instance.stripe_subscription_item_id = line_item["subscription_item"]
 
             instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
-                line_items[0]["period"]["end"],
+                line_item["period"]["end"],
             ).replace(tzinfo=pytz.utc)
             instance.should_setup_billing = False
 
