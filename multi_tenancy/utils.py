@@ -83,3 +83,17 @@ def get_cached_monthly_event_usage(organization: Organization) -> int:
     )  # cache result for default time or until next month
 
     return result
+
+
+def get_billing_cycle_anchor(
+    at_date: datetime.datetime = timezone.now(),
+) -> datetime.datetime:
+    """
+    Computes the billing cycle anchor for a given date to the next applicable's 2nd of the month.
+    """
+    after_trial_date = at_date + datetime.timedelta(days=settings.BILLING_TRIAL_DAYS)
+    if after_trial_date.day <= 2:
+        # Billing anchor should be this month
+        return after_trial_date.replace(day=2)
+    # Billing anchor is next month
+    return (after_trial_date + relativedelta(months=+1)).replace(day=2)
