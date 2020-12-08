@@ -160,19 +160,15 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            organizastion_billing = OrganizationBilling.objects.get(
+            organization_billing = OrganizationBilling.objects.get(
                 stripe_checkout_session=session_id,
             )
         except OrganizationBilling.DoesNotExist:
             pass
         else:
             serializer = PlanSerializer()
-            extra_args["plan"] = serializer.to_representation(
-                organizastion_billing.plan
-            )
-            extra_args[
-                "billing_period_ends"
-            ] = organizastion_billing.billing_period_ends
+            extra_args["plan"] = serializer.to_representation(organization_billing.plan)
+            extra_args["billing_period_ends"] = organization_billing.billing_period_ends
 
     return render_template("billing-welcome.html", request, extra_args)
 
