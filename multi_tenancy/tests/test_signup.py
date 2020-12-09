@@ -14,17 +14,17 @@ class TestTeamSignup(TransactionBaseTest):
         )  # to ensure consistency in tests
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
-    @patch("posthog.api.team.posthoganalytics.identify")
-    @patch("posthog.api.team.posthoganalytics.capture")
+    @patch("posthog.api.organization.posthoganalytics.identify")
+    @patch("posthog.api.organization.posthoganalytics.capture")
     def test_api_sign_up(self, mock_capture, mock_identify, mock_messaging):
         """
-        Overridden from posthog.api.test.test_team to patch Redis call. Original test will not be run
+        Overridden from posthog.api.test.test_organization to patch Redis call. Original test will not be run
         on multitenancy.
         """
 
         with self.settings(EE_AVAILABLE=False):
             response = self.client.post(
-                "/api/team/signup/",
+                "/api/signup/",
                 {
                     "first_name": "John",
                     "email": "hedgehog@posthog.com",
@@ -90,12 +90,12 @@ class TestTeamSignup(TransactionBaseTest):
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_default_user_sign_up(self, mock_messaging, mock_capture):
         """
-        Most of the behavior is tested on the main repo @ posthog.api.test.test_team,
+        Most of the behavior is tested on the main repo @ posthog.api.test.test_organization,
         goal of this test is to assert that the signup_messaging logic is called.
         """
 
         response = self.client.post(
-            "/api/team/signup/",
+            "/api/signup/",
             {
                 "first_name": "John",
                 "email": "hedgehog5@posthog.com",
@@ -139,7 +139,7 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
         response = self.client.post(
-            "/api/team/signup",
+            "/api/signup",
             {
                 "first_name": "John",
                 "email": "hedgehog@posthog.com",
@@ -178,7 +178,7 @@ class TestTeamSignup(TransactionBaseTest):
     def test_user_can_sign_up_with_an_invalid_plan(self, mock_messaging, mock_capture):
 
         response = self.client.post(
-            "/api/team/signup/",
+            "/api/signup/",
             {
                 "first_name": "Jane",
                 "email": "hedgehog6@posthog.com",
@@ -210,8 +210,8 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
-    @patch("posthog.api.team.posthoganalytics.identify")
-    @patch("posthog.api.team.posthoganalytics.capture")
+    @patch("posthog.api.organization.posthoganalytics.identify")
+    @patch("posthog.api.organization.posthoganalytics.capture")
     def test_sign_up_multiple_teams_multi_tenancy(
         self, mock_capture, mock_identify, mock_messaging,
     ):
@@ -220,7 +220,7 @@ class TestTeamSignup(TransactionBaseTest):
         User.objects.create(email="i_was_first@posthog.com")
 
         response = self.client.post(
-            "/api/team/signup/",
+            "/api/signup/",
             {
                 "first_name": "John",
                 "email": "multi@posthog.com",
