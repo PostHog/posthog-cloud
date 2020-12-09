@@ -14,8 +14,8 @@ class TestTeamSignup(TransactionBaseTest):
         )  # to ensure consistency in tests
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
-    @patch("posthog.api.organization.posthoganalytics.identify")
-    @patch("posthog.api.organization.posthoganalytics.capture")
+    @patch("posthoganalytics.identify")
+    @patch("posthoganalytics.capture")
     def test_api_sign_up(self, mock_capture, mock_identify, mock_messaging):
         """
         Overridden from posthog.api.test.test_organization to patch Redis call. Original test will not be run
@@ -210,8 +210,8 @@ class TestTeamSignup(TransactionBaseTest):
         )
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
-    @patch("posthog.api.organization.posthoganalytics.identify")
-    @patch("posthog.api.organization.posthoganalytics.capture")
+    @patch("posthoganalytics.identify")
+    @patch("posthoganalytics.capture")
     def test_sign_up_multiple_teams_multi_tenancy(
         self, mock_capture, mock_identify, mock_messaging,
     ):

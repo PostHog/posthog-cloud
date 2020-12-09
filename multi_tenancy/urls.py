@@ -24,7 +24,7 @@ urlpatterns: List = [
         "api/user", user_with_billing,
     ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
     opt_slash_path(
-        "api/team/signup", MultiTenancyOrgSignupViewset.as_view(),
+        "api/signup", MultiTenancyOrgSignupViewset.as_view(),
     ),  # Override to support setting a billing plan on signup
 ]
 
