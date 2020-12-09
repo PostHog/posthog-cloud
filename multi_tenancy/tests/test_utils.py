@@ -1,33 +1,15 @@
 import datetime
-import random
-import uuid
-from typing import Tuple
 
 import pytz
 from django.test import TestCase
 from django.utils import timezone
-from ee.clickhouse.models.event import create_event
 from freezegun import freeze_time
+from multi_tenancy.tests.base import FactoryMixin
 from multi_tenancy.utils import get_billing_cycle_anchor, get_event_usage_for_timerange
-from posthog.models import Organization, Team
+from posthog.models import Team
 
 
-class TestUtils(TestCase):
-    def create_org_and_team(self) -> Tuple[Organization, Team]:
-        org = Organization.objects.create()
-        team = Team.objects.create(organization=org)
-        return (org, team)
-
-    def event_factory(self, team: Team, quantity: int = 1):
-
-        for _ in range(0, quantity):
-            create_event(
-                team=team,
-                event=random.choice(["$pageview", "$autocapture", "order completed"]),
-                distinct_id=f"distinct_id_{random.randint(100,999)}",
-                event_uuid=uuid.uuid4(),
-            )
-
+class TestUtils(TestCase, FactoryMixin):
     def test_get_billing_cycle_anchor(self):
 
         with freeze_time("2020-01-01"):
