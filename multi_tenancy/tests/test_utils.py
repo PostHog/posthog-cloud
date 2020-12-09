@@ -1,10 +1,33 @@
+import datetime
+import random
+import uuid
+from typing import Tuple
+
+import pytz
 from django.test import TestCase
 from django.utils import timezone
+from ee.clickhouse.models.event import create_event
 from freezegun import freeze_time
-from multi_tenancy.utils import get_billing_cycle_anchor
+from multi_tenancy.utils import get_billing_cycle_anchor, get_event_usage_for_timerange
+from posthog.models import Organization, Team
 
 
 class TestUtils(TestCase):
+    def create_org_and_team(self) -> Tuple[Organization, Team]:
+        org = Organization.objects.create()
+        team = Team.objects.create(organization=org)
+        return (org, team)
+
+    def event_factory(self, team: Team, quantity: int = 1):
+
+        for _ in range(0, quantity):
+            create_event(
+                team=team,
+                event=random.choice(["$pageview", "$autocapture", "order completed"]),
+                distinct_id=f"distinct_id_{random.randint(100,999)}",
+                event_uuid=uuid.uuid4(),
+            )
+
     def test_get_billing_cycle_anchor(self):
 
         with freeze_time("2020-01-01"):
@@ -53,3 +76,47 @@ class TestUtils(TestCase):
                     get_billing_cycle_anchor(timezone.now()).strftime("%Y-%m-%d"),
                     "2021-05-01",
                 )
+
+    def test_get_event_usage_for_timerange(self):
+
+        org, team = self.create_org_and_team()
+        team2 = Team.objects.create(organization=org)
+        another_org, another_team = self.create_org_and_team()
+
+        # Set up some events
+        with freeze_time("2020-03-02"):
+            self.event_factory(team, 4)
+            self.event_factory(team2, 3)
+            self.event_factory(another_team, 8)
+
+        with freeze_time("2020-03-03"):
+            self.event_factory(team, 2)
+            self.event_factory(team2, 1)
+
+        self.assertEqual(
+            get_event_usage_for_timerange(
+                org,
+                datetime.datetime(2020, 3, 2, 0, 0, 0, 0, pytz.UTC),
+                datetime.datetime(2020, 3, 2, 23, 59, 59, 999999, pytz.UTC),
+            ),
+            7,  # 4 from team & 3 from team2
+        )
+
+        self.assertEqual(
+            get_event_usage_for_timerange(
+                org,
+                datetime.datetime(2020, 3, 2, 0, 0, 0, 0, pytz.UTC),
+                datetime.datetime(2020, 3, 3, 23, 59, 59, 999999, pytz.UTC),
+            ),
+            10,
+        )
+
+        self.assertEqual(
+            get_event_usage_for_timerange(
+                another_org,
+                datetime.datetime(2020, 3, 1, 0, 0, 0, 0, pytz.UTC),
+                datetime.datetime(2020, 3, 31, 23, 59, 59, 999999, pytz.UTC),
+            ),
+            8,
+        )
+

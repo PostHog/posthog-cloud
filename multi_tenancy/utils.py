@@ -13,31 +13,22 @@ from posthog.models import Organization, Team
 EVENT_USAGE_CACHING_TTL: int = settings.EVENT_USAGE_CACHING_TTL
 
 
-def get_monthly_event_usage(
-    organization: Organization, at_date: datetime.datetime = None,
+def get_event_usage_for_timerange(
+    organization: Organization,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
 ) -> int:
     """
-    Returns the number of events used in the calendar month (UTC) of the date provided for all
+    Returns the number of events ingested in the time range (inclusive) for all
     teams of the organization. Intended mainly for billing purposes.
     """
-    if not at_date:
-        at_date = timezone.now()
-
-    date_range: Tuple[int] = calendar.monthrange(at_date.year, at_date.month)
-    start_date: datetime.datetime = datetime.datetime.combine(
-        datetime.datetime(at_date.year, at_date.month, 1), datetime.time.min,
-    ).replace(tzinfo=pytz.UTC)
-    end_date: datetime.datetime = datetime.datetime.combine(
-        datetime.datetime(at_date.year, at_date.month, date_range[1]),
-        datetime.time.max,
-    ).replace(tzinfo=pytz.UTC)
 
     result = sync_execute(
         "SELECT count(1) FROM events where team_id IN %(team_ids)s AND timestamp"
         " >= %(date_from)s AND timestamp <= %(date_to)s",
         {
-            "date_from": start_date.strftime("%Y-%m-%d %H:%M:%S"),
-            "date_to": end_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "date_from": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "date_to": end_time.strftime("%Y-%m-%d %H:%M:%S"),
             "team_ids": list(
                 Team.objects.filter(organization=organization).values_list(
                     "id", flat=True,
@@ -52,6 +43,30 @@ def get_monthly_event_usage(
     return (
         -1
     )  # use -1 to distinguish from an actual 0 in case CH is not available (mainly to run posthog tests)
+
+
+def get_monthly_event_usage(
+    organization: Organization, at_date: datetime.datetime = None,
+) -> int:
+    """
+    Returns the number of events ingested in the calendar month (UTC) of the date provided for all
+    teams of the organization. Intended mainly for billing purposes.
+    """
+    if not at_date:
+        at_date = timezone.now()
+
+    date_range: Tuple[int] = calendar.monthrange(at_date.year, at_date.month)
+    start_time: datetime.datetime = datetime.datetime.combine(
+        datetime.datetime(at_date.year, at_date.month, 1), datetime.time.min,
+    ).replace(tzinfo=pytz.UTC)
+    end_time: datetime.datetime = datetime.datetime.combine(
+        datetime.datetime(at_date.year, at_date.month, date_range[1]),
+        datetime.time.max,
+    ).replace(tzinfo=pytz.UTC)
+
+    return get_event_usage_for_timerange(
+        organization=organization, start_time=start_time, end_time=end_time
+    )
 
 
 def get_cached_monthly_event_usage(organization: Organization) -> int:
