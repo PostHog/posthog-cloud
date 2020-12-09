@@ -1,6 +1,6 @@
 import calendar
 import datetime
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pytz
 from dateutil.relativedelta import relativedelta
@@ -40,9 +40,7 @@ def get_event_usage_for_timerange(
     if result:
         return result[0][0]
 
-    return (
-        -1
-    )  # use -1 to distinguish from an actual 0 in case CH is not available (mainly to run posthog tests)
+    return None  # in case CH is not available (mainly to run posthog tests)
 
 
 def get_monthly_event_usage(
@@ -77,11 +75,15 @@ def get_cached_monthly_event_usage(organization: Organization) -> int:
     cache_key: str = f"monthly_usage_{organization.id}"
     cached_result: int = cache.get(cache_key)
 
-    if cached_result:
+    if cached_result is not None:
         return cached_result
 
     now: datetime.datetime = timezone.now()
     result: int = get_monthly_event_usage(organization=organization, at_date=now)
+
+    if result is None:
+        # Don't cache unavailable/error result
+        return result
 
     # Cache the result
     start_of_next_month = datetime.datetime.combine(

@@ -46,3 +46,12 @@ python manage.py test posthog --exclude-tag=skip_on_multitenancy
 ```
 
 Any file on the `multi_tenancy/` or `messaging/` folder will automatically be updated on your working copy at `/deploy`. Please note however that any change to `requirements.txt` or `multi_tenancy_settings.py` **requires manually running `bin/develop` again**.
+
+## Environment variables
+
+Below is the documentation for the environment variables specifically scoped to this project. For the environment variables applicable to the main repo please visit the [docs](https://posthog.com/docs/configuring-posthog/environment-variables).
+
+- `STRIPE_API_KEY`. Secret API key for Stripe. For security reasons only restricted keys should be used.
+- `STRIPE_PUBLISHABLE_KEY`. Publishable API key for Stripe to generate checkout sessions.
+- `STRIPE_WEBHOOK_SECRET`. Secret to verify webhooks indeed come from Stripe.
+- `BILLING_TRIAL_DAYS`. Number of days (integer) to set up a trial for on each new metered or tiered-based subscription. Can be set to `0` for no trial.

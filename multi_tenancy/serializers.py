@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from messaging.tasks import process_organization_signup_messaging
-from posthog.api.team import TeamSignupSerializer
+from posthog.api.organization import OrganizationSignupSerializer
 from posthog.models import User
 from posthog.templatetags.posthog_filters import compact_number
 from rest_framework import serializers
@@ -20,7 +20,7 @@ class ReadOnlySerializer(serializers.ModelSerializer):
         raise NotImplementedError()
 
 
-class MultiTenancyOrgSignupSerializer(TeamSignupSerializer):
+class MultiTenancyOrgSignupSerializer(OrganizationSignupSerializer):
     plan = serializers.CharField(max_length=32, required=False)
 
     def validate_plan(self, data: Dict) -> Optional[Plan]:

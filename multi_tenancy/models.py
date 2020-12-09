@@ -20,7 +20,7 @@ PLANS = {
 
 class Plan(models.Model):
     """
-    Base model for different plans. Note that custom-logic (e.g. doing card validation
+    Base model for different plans. Note that custom logic (e.g. doing card validation
     instead of starting a subscription) is registered in the OrganizationBilling object.
     """
 

@@ -11,7 +11,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from posthog.api.team import TeamSignupViewset
+from posthog.api.organization import OrganizationSignupViewset
 from posthog.api.user import user
 from posthog.templatetags.posthog_filters import compact_number
 from posthog.urls import render_template
@@ -33,7 +33,7 @@ from .utils import get_cached_monthly_event_usage
 logger = logging.getLogger(__name__)
 
 
-class MultiTenancyOrgSignupViewset(TeamSignupViewset):
+class MultiTenancyOrgSignupViewset(OrganizationSignupViewset):
     serializer_class = MultiTenancyOrgSignupSerializer
 
 
@@ -64,20 +64,28 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200:
-        # TODO: Handle multiple organizations
         instance, _created = OrganizationBilling.objects.get_or_create(
             organization=request.user.organization,
         )
 
         output = json.loads(response.content)
-        event_usage: int = get_cached_monthly_event_usage(request.user.organization)
         output["billing"] = {
             "plan": None,
-            "current_usage": {
+        }
+
+        # Obtain event usage of current organization
+        event_usage: Optional[int] = None
+        try:
+            # Function calls clickhouse so make sure Clickhouse failure doesn't block api/user from loading
+            event_usage = get_cached_monthly_event_usage(request.user.organization)
+        except Exception as e:
+            capture_exception(e)
+
+        if event_usage is not None:
+            output["billing"]["current_usage"] = {
                 "value": event_usage,
                 "formatted": compact_number(event_usage),
-            },
-        }
+            }
 
         if instance.plan:
             plan_serializer = PlanSerializer()
