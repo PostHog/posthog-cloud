@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test.testcases import TestCase
 from freezegun import freeze_time
-from multi_tenancy.models import OrganizationBilling
+from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.tasks import compute_daily_usage_for_organizations
 from multi_tenancy.tests.base import FactoryMixin
 
@@ -11,15 +11,19 @@ class TestTasks(TestCase, FactoryMixin):
     @freeze_time("2020-05-07")
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
     def test_compute_daily_usage_for_organizations(self, mock_create_usage_record):
+        plan = Plan.objects.create(
+            key="metered", name="Metered", price_id="m1", is_metered_billing=True
+        )
         org, team = self.create_org_and_team()
         OrganizationBilling.objects.create(
-            organization=org, stripe_subscription_item_id="si_1111111111111"
+            organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
         )
         another_org, another_team = self.create_org_and_team()
         OrganizationBilling.objects.create(
-            organization=another_org, stripe_subscription_item_id="si_01234567890"
+            organization=another_org,
+            stripe_subscription_item_id="si_01234567890",
+            plan=plan,
         )
-        _, unbilled_team = self.create_org_and_team()
 
         # Some noise events that should be ignored
         with freeze_time("2020-05-07"):  # today
@@ -31,7 +35,6 @@ class TestTasks(TestCase, FactoryMixin):
         with freeze_time("2020-05-08"):  # tomorrow
             self.event_factory(team, 1)
             self.event_factory(another_team, 1)
-        self.event_factory(unbilled_team, 3)
 
         # Now some real events
         with freeze_time("2020-05-06T04:39:12"):
@@ -68,3 +71,21 @@ class TestTasks(TestCase, FactoryMixin):
             mock_create_usage_record.call_args_list[1].kwargs["idempotency_key"],
             "si_01234567890-2020-05-06",
         )
+
+    @patch("multi_tenancy.tasks._compute_daily_usage_for_organization")
+    def test_only_rerport_relevant_usage_for_organizations(
+        self, mock_individual_org_task
+    ):
+        plan = Plan.objects.create(key="unmetered", price_id="u1", name="Flat fee")
+        org, team = self.create_org_and_team()
+        OrganizationBilling.objects.create(
+            organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
+        )  # non-metered plan
+        another_org, another_team = self.create_org_and_team()
+        OrganizationBilling.objects.create(
+            organization=another_org, plan=plan,
+        )  # no subscription item ID plan
+        _, unbilled_team = self.create_org_and_team()  # no OrganizationBilling
+
+        compute_daily_usage_for_organizations()
+        mock_individual_org_task.assert_not_called()

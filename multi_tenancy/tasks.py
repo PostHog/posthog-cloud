@@ -12,10 +12,12 @@ from .models import OrganizationBilling
 
 def compute_daily_usage_for_organizations() -> None:
     """
-    Creates a separate async task to calculate the monthly usage for each organization at the specified date.
+    Creates a separate async task to calculate the daily usage for each organization the day before.
     """
 
-    for instance in OrganizationBilling.objects.all():
+    for instance in OrganizationBilling.objects.filter(
+        plan__is_metered_billing=True
+    ).exclude(stripe_subscription_item_id=""):
         _compute_daily_usage_for_organization.delay(
             organization_billing_pk=str(instance.pk)
         )
