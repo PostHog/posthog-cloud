@@ -308,7 +308,7 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
             items=[{"price": "price_zyxwvu"}],
             trial_period_days=30,
             billing_cycle_anchor=datetime.datetime(
-                2021, 1, 2, 23, 59, 59, 999999, tzinfo=pytz.UTC,
+                2021, 1, 1, 23, 59, 59, 999999, tzinfo=pytz.UTC,
             ),
         )
 

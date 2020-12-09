@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from ee.clickhouse.models.event import create_event
 from freezegun import freeze_time
-from multi_tenancy.models import MonthlyBillingRecord, OrganizationBilling, Plan
+from multi_tenancy.models import OrganizationBilling, Plan
 from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
 from rest_framework import status
 
