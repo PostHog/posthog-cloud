@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
@@ -135,3 +136,13 @@ def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:
 
 def compute_webhook_signature(payload: str, secret: str) -> str:
     return stripe.webhook.WebhookSignature._compute_signature(payload, secret)
+
+
+def report_subscription_item_usage(
+    subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime
+) -> bool:
+    _init_stripe()
+    usage_record = stripe.SubscriptionItem.create_usage_record(
+        subscription_item_id, quantity=billed_usage, timestamp=timestamp, action="set"
+    )
+    return bool(usage_record.id)

@@ -6,11 +6,10 @@ from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
 
-from .stripe import (
-    create_subscription,
-    create_subscription_checkout_session,
-    create_zero_auth,
-)
+from multi_tenancy.utils import get_monthly_event_usage
+
+from .stripe import (create_subscription, create_subscription_checkout_session,
+                     create_zero_auth)
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -53,6 +52,35 @@ class Plan(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class MonthlyBillingRecord(models.Model):
+    """
+    Registers the number of events registered for an organization each month (mainly for billing purposes)
+    """
+
+    organization_billing: models.ForeignKey = models.ForeignKey(
+        "OrganizationBilling", on_delete=models.CASCADE, related_name="monthly_records",
+    )
+    billing_period: models.DateField = (
+        models.DateField()
+    )  # represents the month for the billing period, day should be ignored
+    event_usage: models.IntegerField = models.IntegerField(
+        default=0, validators=[MinValueValidator(0)]
+    )  # represents the exact event usage number
+    billed_usage: models.IntegerField = models.IntegerField(
+        default=0, validators=[MinValueValidator(0)]
+    )  # represents the billed number of events (e.g. a trial may affect this number)
+    usage_reported: models.BooleanField = models.BooleanField(
+        default=False
+    )  # whether or not usage has been reported to Stripe
+
+    class Meta:
+        unique_together = ("organization_billing", "billing_period")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class OrganizationBilling(models.Model):
@@ -147,28 +175,24 @@ class OrganizationBilling(models.Model):
             self.should_setup_billing = False
         self.save()
 
+    def calculate_monthly_usage(
+        self, at_date: datetime.datetime
+    ) -> Optional[MonthlyBillingRecord]:
+        billing_period = at_date.date().replace(day=1)  # always day 1
 
-class MonthlyBillingRecord(models.Model):
-    """
-    Registers the number of events registered for an organization each month (mainly for billing purposes)
-    """
+        if self.monthly_records.filter(billing_period=billing_period).exists():
+            # Already calculated for this period, skip
+            return None
 
-    organization_billing: models.ForeignKey = models.ForeignKey(
-        OrganizationBilling, on_delete=models.CASCADE, related_name="monthly_records",
-    )
-    billing_period: models.DateField = (
-        models.DateField()
-    )  # represents the month for the billing period, day should be ignored
-    event_usage: models.IntegerField = models.IntegerField(
-        default=0, validators=[MinValueValidator(0)]
-    )
-    usage_reported: models.BooleanField = models.BooleanField(
-        default=False
-    )  # whether or not usage has been reported to Stripe
+        # TODO: Trial
+        event_usage = get_monthly_event_usage(
+            organization=self.organization, at_date=at_date
+        )
 
-    class Meta:
-        unique_together = ("organization_billing", "billing_period")
+        return MonthlyBillingRecord.objects.create(
+            organization_billing=self,
+            billing_period=billing_period,
+            event_usage=event_usage,
+            billed_usage=event_usage,
+        )
 
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        return super().save(*args, **kwargs)
