@@ -1,7 +1,6 @@
 import datetime
 from typing import List, Optional, Tuple
 
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
@@ -146,29 +145,3 @@ class OrganizationBilling(models.Model):
             self.stripe_subscription_item_id = subscription_id
             self.should_setup_billing = False
         self.save()
-
-
-class MonthlyBillingRecord(models.Model):
-    """
-    Registers the number of events registered for an organization each month (mainly for billing purposes)
-    """
-
-    organization_billing: models.ForeignKey = models.ForeignKey(
-        OrganizationBilling, on_delete=models.CASCADE, related_name="monthly_records",
-    )
-    billing_period: models.DateField = (
-        models.DateField()
-    )  # represents the month for the billing period, day should be ignored
-    event_usage: models.IntegerField = models.IntegerField(
-        default=0, validators=[MinValueValidator(0)]
-    )
-    usage_reported: models.BooleanField = models.BooleanField(
-        default=False
-    )  # whether or not usage has been reported to Stripe
-
-    class Meta:
-        unique_together = ("organization_billing", "billing_period")
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        return super().save(*args, **kwargs)
