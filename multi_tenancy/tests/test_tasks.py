@@ -1,5 +1,7 @@
+import datetime
 from unittest.mock import patch
 
+import pytz
 from django.test.testcases import TestCase
 from freezegun import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
@@ -90,3 +92,45 @@ class TestTasks(TestCase, FactoryMixin):
 
         compute_daily_usage_for_organizations()
         mock_individual_org_task.assert_not_called()
+
+    @freeze_time("2020-11-11")
+    @patch("multi_tenancy.stripe._init_stripe")
+    @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
+    def test_compute_daily_usage_for_different_date(self, mock_create_usage_record, _):
+        plan = Plan.objects.create(
+            key="metered", name="Metered", price_id="m1", is_metered_billing=True
+        )
+        org, team = self.create_org_and_team()
+        OrganizationBilling.objects.create(
+            organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
+        )
+        # Some noise events that should be ignored
+        with freeze_time("2020-11-11"):  # today
+            self.event_factory(team, 4)
+        with freeze_time("2020-11-10"):  # yesterday
+            self.event_factory(team, 6)
+        with freeze_time("2020-11-09"):  # 2 days ago
+            self.event_factory(team, 1)
+
+        # Now some real events
+        with freeze_time("2020-11-03T09:39:12"):
+            self.event_factory(team, 5)
+
+        with freeze_time("2020-11-03T12:59:45"):
+            self.event_factory(team, 11)
+
+        compute_daily_usage_for_organizations(
+            datetime.datetime(2020, 11, 3, tzinfo=pytz.UTC)
+        )
+        self.assertEqual(mock_create_usage_record.call_count, 1)
+
+        self.assertEqual(
+            mock_create_usage_record.call_args_list[0].args, ("si_1111111111111",)
+        )
+        self.assertEqual(
+            mock_create_usage_record.call_args_list[0].kwargs["quantity"], 16
+        )
+        self.assertEqual(
+            mock_create_usage_record.call_args_list[0].kwargs["idempotency_key"],
+            "si_1111111111111-2020-11-03",
+        )

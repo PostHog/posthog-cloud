@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional
 
 import dateutil
 from django.utils import timezone
@@ -10,7 +11,9 @@ from multi_tenancy.utils import get_event_usage_for_timerange
 from .models import OrganizationBilling
 
 
-def compute_daily_usage_for_organizations() -> None:
+def compute_daily_usage_for_organizations(
+    for_date: Optional[datetime.datetime] = None,
+) -> None:
     """
     Creates a separate async task to calculate the daily usage for each organization the day before.
     """
@@ -19,17 +22,25 @@ def compute_daily_usage_for_organizations() -> None:
         plan__is_metered_billing=True
     ).exclude(stripe_subscription_item_id=""):
         _compute_daily_usage_for_organization.delay(
-            organization_billing_pk=str(instance.pk)
+            organization_billing_pk=str(instance.pk), for_date=for_date,
         )
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3)
-def _compute_daily_usage_for_organization(self, organization_billing_pk: str) -> None:
+def _compute_daily_usage_for_organization(
+    self, organization_billing_pk: str, for_date: Optional[str]
+) -> None:
+
+    target_date = (
+        dateutil.parser.parse(for_date)
+        if for_date
+        else timezone.now()
+        - datetime.timedelta(days=1)  # by default we do the day before
+    )
 
     instance = OrganizationBilling.objects.get(pk=organization_billing_pk)
-    yesterday = timezone.now() - datetime.timedelta(days=1)
-    start_time = datetime.datetime.combine(yesterday, datetime.time.min)
-    end_time = datetime.datetime.combine(yesterday, datetime.time.max)
+    start_time = datetime.datetime.combine(target_date, datetime.time.min)
+    end_time = datetime.datetime.combine(target_date, datetime.time.max)
     event_usage = get_event_usage_for_timerange(
         organization=instance.organization, start_time=start_time, end_time=end_time
     )
@@ -41,19 +52,19 @@ def _compute_daily_usage_for_organization(self, organization_billing_pk: str) ->
     report_monthly_usage.delay(
         subscription_item_id=instance.stripe_subscription_item_id,
         billed_usage=event_usage,
-        timestamp=start_time,
+        for_date=start_time,
     )
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3)
 def report_monthly_usage(
-    self, subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime
+    self, subscription_item_id: str, billed_usage: int, for_date: str
 ) -> None:
 
     success = report_subscription_item_usage(
         subscription_item_id=subscription_item_id,
         billed_usage=billed_usage,
-        timestamp=dateutil.parser.parse(timestamp),
+        timestamp=dateutil.parser.parse(for_date),
     )
 
     if not success:
