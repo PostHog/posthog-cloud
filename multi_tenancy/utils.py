@@ -17,7 +17,7 @@ def get_event_usage_for_timerange(
     organization: Organization,
     start_time: datetime.datetime,
     end_time: datetime.datetime,
-) -> int:
+) -> Optional[int]:
     """
     Returns the number of events ingested in the time range (inclusive) for all
     teams of the organization. Intended mainly for billing purposes.

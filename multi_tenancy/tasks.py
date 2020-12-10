@@ -34,7 +34,7 @@ def _compute_daily_usage_for_organization(self, organization_billing_pk: str) ->
         organization=instance.organization, start_time=start_time, end_time=end_time
     )
 
-    if event_usage < 0:
+    if event_usage is None:
         # Clickhouse not available, retry
         raise self.retry()
 

@@ -9,7 +9,6 @@ from multi_tenancy.tests.base import FactoryMixin
 
 class TestTasks(TestCase, FactoryMixin):
     @freeze_time("2020-05-07")
-
     @patch("multi_tenancy.stripe._init_stripe")
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
     def test_compute_daily_usage_for_organizations(self, mock_create_usage_record, _):
