@@ -11,10 +11,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g yarn@1 \
     && yarn config set network-timeout 300000 \
-    && yarn --frozen-lockfile
+    && yarn --frozen-lockfile \
+    && yarn build \
+    && cd plugins \
+    && yarn --frozen-lockfile --ignore-optional \
+    && cd .. \
+    && yarn cache clean \
+    && apt-get purge -y curl build-essential \
+    && rm -rf node_modules \
+	&& rm -rf /var/lib/apt/lists/* \
+    && rm -rf frontend/dist/*.map
 
 
-# Grab posthog from local
+# Grab posthog from local (You must have posthog cloned here)
 COPY ./deploy .
 
 # add local dependencies
@@ -33,7 +42,5 @@ COPY ./messaging /code/messaging/
 COPY multi_tenancy_settings.py /code/cloud_settings.py
 RUN cat /code/cloud_settings.py >> /code/posthog/settings.py
 
-RUN yarn install
-RUN yarn build
 RUN DATABASE_URL='postgres:///' REDIS_URL='redis:///' SECRET_KEY='no' python manage.py collectstatic --noinput
 CMD ["./gunicorn posthog.wsgi --log-file -"]
