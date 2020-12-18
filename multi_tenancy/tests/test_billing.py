@@ -220,6 +220,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "allowance": {"value": 50000, "formatted": "50K"},
                 "image_url": "",
                 "self_serve": False,
+                "is_metered_billing": False,
             },
         )
 
@@ -296,6 +297,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "allowance": None,
                 "image_url": "",
                 "self_serve": False,
+                "is_metered_billing": False,
             },
         )
 
@@ -371,6 +373,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "allowance": None,
                 "image_url": "",
                 "self_serve": False,
+                "is_metered_billing": True,
             },
         )
 
