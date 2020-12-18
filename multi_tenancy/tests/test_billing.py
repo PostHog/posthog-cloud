@@ -486,6 +486,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "allowance": {"value": 8500000, "formatted": "8.5M"},
                 "image_url": "http://test.posthog.com/image.png",
                 "self_serve": True,
+                "is_metered_billing": False,
             },
         )
 
@@ -704,6 +705,7 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "allowance",
                     "image_url",
                     "self_serve",
+                    "is_metered_billing",
                 ],
             )
 
@@ -738,6 +740,7 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "allowance",
                     "image_url",
                     "self_serve",
+                    "is_metered_billing",
                 ],
             )
             self.assertEqual(obj.self_serve, True)
