@@ -21,8 +21,7 @@ RUN apt-get update \
     && yarn cache clean \
     && apt-get purge -y curl build-essential \
     && rm -rf node_modules \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf frontend/dist/*.map 
+    && rm -rf /var/lib/apt/lists/*
 
 # Block for posthog cloud additions 
 COPY requirements.txt /code/cloud_requirements.txt
