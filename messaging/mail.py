@@ -1,10 +1,11 @@
+import re
 from typing import ClassVar, Dict, Optional
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
-import re
 from .models import UserMessagingRecord
+
 
 class Mail:
     FROM_ADDRESS: ClassVar[str] = "PostHog Team <hey@posthog.com>"
@@ -75,6 +76,7 @@ class Mail:
             from_email=cls.FROM_ADDRESS,
             to=[f"{pattern.sub('', name)} <{email_address}>"],
             headers=cls.EMAIL_HEADERS,
+            reply_to=settings.EMAIL_REPLY_TO,
         )
         email_message.attach_alternative(html_content, "text/html")
         email_message.send()
