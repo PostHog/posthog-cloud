@@ -66,11 +66,7 @@ class TestTeamSignup(TransactionBaseTest):
 
         mock_identify.assert_called_once_with(
             user.distinct_id,
-            properties={
-                "email": "hedgehog@posthog.com",
-                "realm": "cloud",
-                "ee_available": False,
-            },
+            properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Assert that the user is logged in
@@ -163,7 +159,8 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.id, organization_id=str(organization.id),
+            user_id=user.id,
+            organization_id=str(organization.id),
         )
 
         # Check that we send the sign up event to PostHog analytics
@@ -206,14 +203,16 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.pk, organization_id=str(organization.id),
+            user_id=user.pk,
+            organization_id=str(organization.id),
         )
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
-    @patch("posthoganalytics.identify")
     @patch("posthoganalytics.capture")
     def test_sign_up_multiple_teams_multi_tenancy(
-        self, mock_capture, mock_identify, mock_messaging,
+        self,
+        mock_capture,
+        mock_messaging,
     ):
 
         # Create a user first to make sure additional users can be created
@@ -251,15 +250,6 @@ class TestTeamSignup(TransactionBaseTest):
             properties={"is_first_user": False, "is_organization_first_user": True},
         )
 
-        mock_identify.assert_called_once_with(
-            user.distinct_id,
-            properties={
-                "email": "multi@posthog.com",
-                "realm": "cloud",
-                "ee_available": True,
-            },
-        )
-
         # Assert that the user is logged in
         response = self.client.get("/api/user/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -270,5 +260,6 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.pk, organization_id=str(user.organization.id),
+            user_id=user.pk,
+            organization_id=str(user.organization.id),
         )
