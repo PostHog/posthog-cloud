@@ -66,7 +66,7 @@ class TestTeamSignup(TransactionBaseTest):
 
         mock_identify.assert_called_once_with(
             user.distinct_id,
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            {"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Assert that the user is logged in
