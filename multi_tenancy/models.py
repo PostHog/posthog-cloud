@@ -16,6 +16,7 @@ PLANS = {
     "growth": ["zapier", "organizations_projects"],
     "startup": ["zapier", "organizations_projects"],
     "standard": ["zapier", "organizations_projects"],
+    "enterprise": ["zapier", "organizations_projects"],
 }
 
 
