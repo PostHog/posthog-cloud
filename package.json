@@ -6,7 +6,7 @@
     "yarn": "1.x"
   },
   "scripts": {
-    "heroku-postbuild": "bin/pull_main && cd deploy && yarn install --frozen-lockfile && yarn build && cp requirements.txt ../",
+    "heroku-postbuild": "bin/pull_main && cd deploy && yarn install --production=false --frozen-lockfile && yarn build && cp requirements.txt ../",
     "build": "cd deploy && yarn build"
   },
   "cacheDirectories": [
