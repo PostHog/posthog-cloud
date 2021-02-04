@@ -48,7 +48,6 @@ class MultiTenancyOrgSignupSerializer(OrganizationSignupSerializer):
 
 
 class PlanSerializer(ReadOnlySerializer):
-    allowance = serializers.SerializerMethodField()
 
     class Meta:
         model = Plan
@@ -63,14 +62,6 @@ class PlanSerializer(ReadOnlySerializer):
             "price_string",
             "description",
         ]
-
-    def get_allowance(self, obj: Plan) -> Optional[Dict]:
-        if not obj.event_allowance:
-            return None
-        return {
-            "value": obj.event_allowance,
-            "formatted": compact_number(obj.event_allowance),
-        }
 
 
 class BillingSubscribeSerializer(serializers.Serializer):

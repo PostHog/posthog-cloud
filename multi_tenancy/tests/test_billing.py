@@ -63,6 +63,7 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
 
         # Active plan
         billing.billing_period_ends = timezone.now() + datetime.timedelta(seconds=30)
+        billing.should_setup_billing = False
         billing.save()
         self.assertEqual(billing.get_plan_key(), plan.key)
 
@@ -105,11 +106,25 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
             billing.available_features, ["zapier", "organizations_projects"]
         )
 
+        # Standard plan
+        plan.key = "standard"
+        plan.save()
+        self.assertEqual(
+            billing.available_features, ["zapier", "organizations_projects"]
+        )
+
+        # Enterprise plan
+        plan.key = "enterprise"
+        plan.save()
+        self.assertEqual(
+            billing.available_features, ["zapier", "organizations_projects"]
+        )
+
     def test_feature_available_multi_tenancy(self):
         organization, _, _ = self.create_org_team_user()
         plan = self.create_plan(key="starter")
         billing = OrganizationBilling.objects.create(
-            organization=organization, plan=plan
+            organization=organization, plan=plan,
         )
 
         # Inactive billing period
@@ -122,6 +137,31 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
 
         # Unavailable feature
         self.assertFalse(organization.is_feature_available("zapier"))
+
+    def test_event_allocation_property(self):
+        organization, _, _ = self.create_org_team_user()
+        billing = OrganizationBilling.objects.create(
+            organization=organization,
+        )
+
+        # Defaults to no event allocation, which in turn defaults to None
+        self.assertEqual(billing.event_allocation, None)
+
+        with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
+            self.assertEqual(billing.event_allocation, {"value": 133, "formatted": "133"})
+
+        # Still defaults to no plan allocation because plan is not active
+        plan = self.create_plan(key="starter", event_allowance=7777)
+        billing.plan = plan
+        billing.save()
+        with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
+            self.assertEqual(billing.event_allocation, {"value": 133, "formatted": "133"})
+
+        # Plan is now active
+        billing.billing_period_ends = timezone.now() + datetime.timedelta(days=4)
+        billing.save()
+        with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
+            self.assertEqual(billing.event_allocation, {"value": 7777, "formatted": "7.7K"})
 
 
 class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
@@ -139,7 +179,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         response_data: Dict = response.json()
         self.assertEqual(
             response_data["billing"],
-            {"plan": None, "current_usage": {"formatted": "0", "value": 0}},
+            {"plan": None, "current_usage": {"formatted": "0", "value": 0}, "event_allocation": None},
         )
 
         # OrganizationBilling object should've been created if non-existent
@@ -152,6 +192,23 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(org_billing.should_setup_billing, False)
         self.assertEqual(org_billing.stripe_customer_id, "")
         self.assertEqual(org_billing.stripe_checkout_session, "")
+
+    def test_provide_event_allocation_for_when_no_billing_plan_is_setup(self):
+
+        with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=7500):
+            response = self.client.post("/api/user/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_data: Dict = response.json()
+        self.assertEqual(
+            response_data["billing"],
+            {
+                "plan": None,
+                "current_usage": {"formatted": "0", "value": 0},
+                "event_allocation": {"formatted": "7.5K", "value": 7500},
+            },
+        )
 
     def test_team_that_should_not_set_up_billing(self):
         organization, team, user = self.create_org_team_user()
@@ -176,7 +233,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         response_data: Dict = response.json()
         self.assertEqual(
             response_data["billing"],
-            {"plan": None, "current_usage": {"value": 3, "formatted": "3"}},
+            {"plan": None, "current_usage": {"value": 3, "formatted": "3"}, "event_allocation": None},
         )
 
     @patch("multi_tenancy.stripe._get_customer_id")
@@ -233,6 +290,8 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": False,
+                "price_string": "",
+                "description": "",
             },
         )
 
@@ -315,6 +374,8 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": False,
+                "price_string": "",
+                "description": "",
             },
         )
 
@@ -329,7 +390,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
     @patch("multi_tenancy.stripe._get_customer_id")
     @patch("multi_tenancy.stripe.stripe.checkout.Session.create")
     def test_start_checkout_session_for_metered_billing_plan(
-        self, mock_checkout, mock_customer_id
+        self, mock_checkout, mock_customer_id,
     ):
         """
         Tests that a checkout session is properly created for a metered-billing plan
@@ -395,6 +456,8 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": True,
+                "price_string": "",
+                "description": "",
             },
         )
 
@@ -511,6 +574,8 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "image_url": "http://test.posthog.com/image.png",
                 "self_serve": True,
                 "is_metered_billing": False,
+                "price_string": "",
+                "description": "",
             },
         )
 
@@ -555,7 +620,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         response_data: Dict = response.json()
         self.assertEqual(
             response_data["billing"],
-            {"plan": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
+            {"plan": None, "event_allocation": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
         )
 
     @freeze_time("2018-12-31T22:59:59.000000Z")
@@ -749,6 +814,8 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "image_url",
                     "self_serve",
                     "is_metered_billing",
+                    "price_string",
+                    "description",
                 ],
             )
 
@@ -786,6 +853,8 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "image_url",
                     "self_serve",
                     "is_metered_billing",
+                    "price_string",
+                    "description",
                 ],
             )
             self.assertEqual(obj.self_serve, True)

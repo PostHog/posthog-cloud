@@ -1,10 +1,10 @@
 import datetime
 import json
 import logging
-import posthoganalytics
 from distutils.util import strtobool
 from typing import Dict, Optional
 
+import posthoganalytics
 import pytz
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -23,11 +23,8 @@ from sentry_sdk import capture_exception, capture_message
 import stripe
 
 from .models import OrganizationBilling, Plan
-from .serializers import (
-    BillingSubscribeSerializer,
-    MultiTenancyOrgSignupSerializer,
-    PlanSerializer,
-)
+from .serializers import (BillingSubscribeSerializer,
+                          MultiTenancyOrgSignupSerializer, PlanSerializer)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -71,13 +68,9 @@ def user_with_billing(request: HttpRequest):
 
         output = json.loads(response.content)
 
-        no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION # use this by default, overridden if org has an active plan
         output["billing"] = {
             "plan": None,
-            "event_allocation": {
-                "value": no_plan_event_allocation,
-                "formatted": compact_number(no_plan_event_allocation),
-            }  if no_plan_event_allocation else None,
+            "event_allocation": instance.event_allocation,
         }
 
         # Obtain event usage of current organization
@@ -139,10 +132,6 @@ def user_with_billing(request: HttpRequest):
                         "stripe_checkout_session": checkout_session,
                         "subscription_url": f"/billing/setup?session_id={checkout_session}",
                     }
-
-            else:
-                # Billing is active, use the plan allowance
-                output["billing"]["event_allocation"] = output["billing"]["plan"]["allowance"]
 
         response = JsonResponse(output)
 

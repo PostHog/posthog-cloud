@@ -1,9 +1,11 @@
 import datetime
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
+from posthog.templatetags.posthog_filters import compact_number
 
 from .stripe import (create_subscription, create_subscription_checkout_session,
                      create_zero_auth)
@@ -58,6 +60,19 @@ class Plan(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def allowance(self) -> Optional[Dict[str, Union[str, int]]]:
+        """
+        Formatted event allowance.
+        """
+        if not self.event_allowance:
+            return None
+
+        return {
+            "value": self.event_allowance,
+            "formatted": compact_number(self.event_allowance),
+        }
+
 
 class OrganizationBilling(models.Model):
     """An extension to Organization for handling PostHog Cloud billing."""
@@ -101,6 +116,25 @@ class OrganizationBilling(models.Model):
 
     def get_price_id(self) -> str:
         return self.plan.price_id if self.plan else ""
+
+    @property
+    def event_allocation(self) -> Optional[Dict[str, Union[str, int]]]:
+        """
+        Returns the event allocation applicable to the organization.
+        """
+        if not self.plan or not self.is_billing_active:
+            # No active billing plan, default to event allocation for when no billing plan is active
+            no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION
+
+            if not no_plan_event_allocation:
+                return None
+
+            return {
+                "value": no_plan_event_allocation,
+                "formatted": compact_number(no_plan_event_allocation),
+            }
+
+        return self.plan.allowance
 
     @property
     def available_features(self) -> List[str]:
