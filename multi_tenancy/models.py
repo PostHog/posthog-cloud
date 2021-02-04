@@ -103,7 +103,8 @@ class OrganizationBilling(models.Model):
 
     @property
     def is_billing_active(self) -> bool:
-        return not self.should_setup_billing and self.billing_period_ends and self.billing_period_ends > timezone.now()
+        return bool(self.plan and not self.should_setup_billing and self.billing_period_ends
+                and self.billing_period_ends > timezone.now())
 
     def get_plan_key(self, only_active: bool = True) -> Optional[str]:
         """

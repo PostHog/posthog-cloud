@@ -39,6 +39,41 @@ class TestPlan(BaseTest):
 
 
 class TestOrganizationBilling(BaseTest, PlanTestMixin):
+
+    def test_billing_is_active(self):
+
+        plan = self.create_plan()
+        organization, _, _ = self.create_org_team_user()
+
+        billing = OrganizationBilling.objects.create(
+            organization=organization, should_setup_billing=True,
+        )
+
+        # Active billing
+        self.assertEqual(billing.is_billing_active, False)
+        billing.should_setup_billing = False
+        billing.billing_period_ends = timezone.now() + datetime.timedelta(seconds=30)
+        billing.plan = plan
+        billing.save()
+        self.assertEqual(billing.is_billing_active, True)
+
+        # No plan
+        billing.plan = None
+        billing.save()
+        self.assertEqual(billing.is_billing_active, False)
+
+        # Has not finished setting up billing
+        billing.plan = plan
+        billing.should_setup_billing = True
+        billing.save()
+        self.assertEqual(billing.is_billing_active, False)
+
+        # Expired billing
+        billing.should_setup_billing = False
+        billing.billing_period_ends = timezone.now() - datetime.timedelta(seconds=30)
+        billing.save()
+        self.assertEqual(billing.is_billing_active, False)
+
     def test_plan_key_method(self):
         plan = self.create_plan()
         organization, _, _ = self.create_org_team_user()

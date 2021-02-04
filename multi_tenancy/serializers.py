@@ -79,7 +79,7 @@ class BillingSubscribeSerializer(serializers.Serializer):
 
         user: User = self.context["request"].user
 
-        instance, _created = OrganizationBilling.objects.get_or_create(
+        instance, _ = OrganizationBilling.objects.get_or_create(
             organization=user.organization,
         )
 
