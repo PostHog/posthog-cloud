@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import posthoganalytics
 from distutils.util import strtobool
 from typing import Dict, Optional
 
@@ -147,20 +148,26 @@ def stripe_checkout_view(request: HttpRequest):
 
 
 def stripe_billing_portal(request: HttpRequest):
+    url = ""
 
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
-    instance, created = OrganizationBilling.objects.get_or_create(
+    instance, _ = OrganizationBilling.objects.get_or_create(
         organization=request.user.organization,
     )
 
     if instance.stripe_customer_id:
         url = customer_portal_url(instance.stripe_customer_id)
-        if url:
-            return redirect(url)
 
-    return redirect("/")
+    # Report event manually because this page doesn't load any HTML (i.e. there's no autocapture available).
+    posthoganalytics.capture(
+        request.user.distinct_id,
+        "visited billing customer portal",
+        {"portal_available": bool(url)},
+    )
+
+    return redirect(url or "/")
 
 
 def billing_welcome_view(request: HttpRequest):
