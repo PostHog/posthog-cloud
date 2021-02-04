@@ -544,7 +544,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         )
 
     def test_cannot_start_double_billing_subscription(self):
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(
             event_allowance=8_500_000,
             image_url="http://test.posthog.com/image.png",
@@ -552,7 +552,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         )
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization,
-            should_setup_billing=True,
+            should_setup_billing=False,
             plan=plan,
             billing_period_ends=timezone.now()
             + timezone.timedelta(minutes=random.randint(10, 99)),
