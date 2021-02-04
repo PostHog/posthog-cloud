@@ -70,10 +70,11 @@ def user_with_billing(request: HttpRequest):
         )
 
         output = json.loads(response.content)
-        no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION
+
+        no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION # use this by default, overridden if org has an active plan
         output["billing"] = {
             "plan": None,
-            "no_plan_event_allocation": {
+            "event_allocation": {
                 "value": no_plan_event_allocation,
                 "formatted": compact_number(no_plan_event_allocation),
             }  if no_plan_event_allocation else None,
@@ -138,6 +139,10 @@ def user_with_billing(request: HttpRequest):
                         "stripe_checkout_session": checkout_session,
                         "subscription_url": f"/billing/setup?session_id={checkout_session}",
                     }
+
+            else:
+                # Billing is active, use the plan allowance
+                output["billing"]["event_allocation"] = output["billing"]["plan"]["allowance"]
 
         response = JsonResponse(output)
 
