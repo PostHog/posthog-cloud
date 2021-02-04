@@ -60,6 +60,8 @@ class PlanSerializer(ReadOnlySerializer):
             "image_url",
             "self_serve",
             "is_metered_billing",
+            "price_string",
+            "description",
         ]
 
     def get_allowance(self, obj: Plan) -> Optional[Dict]:

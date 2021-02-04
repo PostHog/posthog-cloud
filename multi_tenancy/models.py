@@ -5,11 +5,8 @@ from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
 
-from .stripe import (
-    create_subscription,
-    create_subscription_checkout_session,
-    create_zero_auth,
-)
+from .stripe import (create_subscription, create_subscription_checkout_session,
+                     create_zero_auth)
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -40,13 +37,19 @@ class Plan(models.Model):
     )  # number of monthly events that this plan allows; use null for unlimited events
     is_active: models.BooleanField = models.BooleanField(default=True)
     is_metered_billing: models.BooleanField = models.BooleanField(
-        default=False
+        default=False,
     )  # whether the plan is usaged-based (metered event-based billing) instead of flat-fee recurring billing;
     # https://stripe.com/docs/billing/subscriptions/metered-billing
     self_serve: models.BooleanField = models.BooleanField(
         default=False,
     )  # Whether users can subscribe to this plan by themselves **after sign up**
     image_url: models.URLField = models.URLField(max_length=1024, blank=True)
+    price_string: models.CharField = models.CharField(
+        max_length=128, blank=True,
+    )  # A human-friendly representation of the price of the plan to show on the front-end UI.
+    # TODO: Obtain price string dynamically from Stripe to have a centralized source of information.
+    description: models.TextField = models.TextField(blank=True)  # Human-friendly description of the plan
+    # TODO: Use this description on posthog.com/pricing to have a ccentralized source of information.
 
     def save(self, *args, **kwargs):
         self.full_clean()
