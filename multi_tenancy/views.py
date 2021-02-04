@@ -70,8 +70,13 @@ def user_with_billing(request: HttpRequest):
         )
 
         output = json.loads(response.content)
+        no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION
         output["billing"] = {
             "plan": None,
+            "no_plan_event_allocation": {
+                "value": no_plan_event_allocation,
+                "formatted": compact_number(no_plan_event_allocation),
+            }  if no_plan_event_allocation else None,
         }
 
         # Obtain event usage of current organization
