@@ -34,3 +34,5 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 # https://github.com/posthog/posthog-production
 
 BILLING_TRIAL_DAYS = os.environ.get("BILLING_TRIAL_DAYS", 0)
+
+MIDDLEWARE.append('multi_tenancy.middleware.PosthogTokenCookieMiddleware')
