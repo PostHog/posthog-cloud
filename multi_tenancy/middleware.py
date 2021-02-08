@@ -1,13 +1,13 @@
 from django.contrib.sessions.middleware import SessionMiddleware
 
 default_cookie_options = {
-    'max_age': 365 * 24 * 60 * 60,  # max_age = one year
-    'expires': None,  # expires
-    'path': "/",  # path
-    'domain': None,  # domain
-    'secure': True,  # secure
-    'httponly': True,  # httponly
-    'samesite': "Lax",  # samesite, can't be set to "None" here :(
+    'max_age': 365 * 24 * 60 * 60,  # one year
+    'expires': None,  
+    'path': "/",  
+    'domain': None,  
+    'secure': True,  
+    'httponly': True,  
+    'samesite': "Lax",  # can't be set to "None" here 
 }
 
 
