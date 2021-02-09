@@ -2,6 +2,7 @@ import datetime
 from typing import Dict, List, Optional, Tuple, Union
 
 from django.conf import settings
+from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
@@ -50,8 +51,8 @@ class Plan(models.Model):
         max_length=128, blank=True,
     )  # A human-friendly representation of the price of the plan to show on the front-end UI.
     # TODO: Obtain price string dynamically from Stripe to have a centralized source of information.
-    description: models.TextField = models.TextField(blank=True)  # Human-friendly description of the plan
-    # TODO: Use this description on posthog.com/pricing to have a ccentralized source of information.
+    description: JSONField = JSONField(default=dict, blank=True)  # Detailed information of the plan
+    # TODO: Use this description on posthog.com/pricing to have a centralized source of information.
 
     def save(self, *args, **kwargs):
         self.full_clean()
