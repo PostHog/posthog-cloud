@@ -1,20 +1,20 @@
 import datetime
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from posthog.models import Organization, User
+from posthog.templatetags.posthog_filters import compact_number
 
-from .stripe import (
-    create_subscription,
-    create_subscription_checkout_session,
-    create_zero_auth,
-)
+from .stripe import create_subscription, create_subscription_checkout_session, create_zero_auth
 
 PLANS = {
     "starter": ["organizations_projects"],
     "growth": ["zapier", "organizations_projects"],
     "startup": ["zapier", "organizations_projects"],
+    "standard": ["zapier", "organizations_projects"],
+    "enterprise": ["zapier", "organizations_projects"],
 }
 
 
@@ -28,9 +28,7 @@ class Plan(models.Model):
         max_length=32, unique=True, db_index=True,
     )
     name: models.CharField = models.CharField(max_length=128)
-    default_should_setup_billing: models.BooleanField = models.BooleanField(
-        default=False,
-    )
+    default_should_setup_billing: models.BooleanField = models.BooleanField(default=False,)
     custom_setup_billing_message: models.TextField = models.TextField(blank=True)
     price_id: models.CharField = models.CharField(max_length=128)
     event_allowance: models.IntegerField = models.IntegerField(
@@ -38,13 +36,17 @@ class Plan(models.Model):
     )  # number of monthly events that this plan allows; use null for unlimited events
     is_active: models.BooleanField = models.BooleanField(default=True)
     is_metered_billing: models.BooleanField = models.BooleanField(
-        default=False
+        default=False,
     )  # whether the plan is usaged-based (metered event-based billing) instead of flat-fee recurring billing;
     # https://stripe.com/docs/billing/subscriptions/metered-billing
     self_serve: models.BooleanField = models.BooleanField(
         default=False,
     )  # Whether users can subscribe to this plan by themselves **after sign up**
     image_url: models.URLField = models.URLField(max_length=1024, blank=True)
+    price_string: models.CharField = models.CharField(
+        max_length=128, blank=True,
+    )  # A human-friendly representation of the price of the plan to show on the front-end UI.
+    # TODO: Obtain price string dynamically from Stripe to have a centralized source of information
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -53,15 +55,25 @@ class Plan(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def allowance(self) -> Optional[Dict[str, Union[str, int]]]:
+        """
+        Formatted event allowance.
+        """
+        if not self.event_allowance:
+            return None
+
+        return {
+            "value": self.event_allowance,
+            "formatted": compact_number(self.event_allowance),
+        }
+
 
 class OrganizationBilling(models.Model):
     """An extension to Organization for handling PostHog Cloud billing."""
 
     organization: models.OneToOneField = models.OneToOneField(
-        Organization,
-        on_delete=models.CASCADE,
-        primary_key=True,
-        related_name="billing",
+        Organization, on_delete=models.CASCADE, primary_key=True, related_name="billing",
     )
     stripe_customer_id: models.CharField = models.CharField(max_length=128, blank=True)
     stripe_checkout_session: models.CharField = models.CharField(
@@ -83,7 +95,12 @@ class OrganizationBilling(models.Model):
 
     @property
     def is_billing_active(self) -> bool:
-        return self.billing_period_ends and self.billing_period_ends > timezone.now()
+        return bool(
+            self.plan
+            and not self.should_setup_billing
+            and self.billing_period_ends
+            and self.billing_period_ends > timezone.now()
+        )
 
     def get_plan_key(self, only_active: bool = True) -> Optional[str]:
         """
@@ -98,6 +115,25 @@ class OrganizationBilling(models.Model):
         return self.plan.price_id if self.plan else ""
 
     @property
+    def event_allocation(self) -> Optional[Dict[str, Union[str, int]]]:
+        """
+        Returns the event allocation applicable to the organization.
+        """
+        if not self.plan or not self.is_billing_active:
+            # No active billing plan, default to event allocation for when no billing plan is active
+            no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION
+
+            if no_plan_event_allocation is None:
+                return None
+
+            return {
+                "value": no_plan_event_allocation,
+                "formatted": compact_number(no_plan_event_allocation),
+            }
+
+        return self.plan.allowance
+
+    @property
     def available_features(self) -> List[str]:
         plan_key = self.get_plan_key()
 
@@ -106,9 +142,7 @@ class OrganizationBilling(models.Model):
 
         return []
 
-    def create_checkout_session(
-        self, user: User, base_url: str,
-    ) -> Tuple[Optional[str], Optional[str]]:
+    def create_checkout_session(self, user: User, base_url: str,) -> Tuple[Optional[str], Optional[str]]:
         """
         Creates a checkout session for the specified plan.
         Uses any custom logic specific to the plan if configured.
@@ -118,17 +152,10 @@ class OrganizationBilling(models.Model):
         # agreement is not yet created. This is coincidentally the same behavior for the startup plan.
         if self.plan.is_metered_billing or self.plan.key == "startup":
             # For the startup plan we only do a card validation (no subscription)
-            return create_zero_auth(
-                email=user.email,
-                base_url=base_url,
-                customer_id=self.stripe_customer_id,
-            )
+            return create_zero_auth(email=user.email, base_url=base_url, customer_id=self.stripe_customer_id,)
 
         return create_subscription_checkout_session(
-            email=user.email,
-            base_url=base_url,
-            price_id=self.plan.price_id,
-            customer_id=self.stripe_customer_id,
+            email=user.email, base_url=base_url, price_id=self.plan.price_id, customer_id=self.stripe_customer_id,
         )
 
     def handle_post_card_validation(self) -> None:
@@ -139,9 +166,7 @@ class OrganizationBilling(models.Model):
             self.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
             self.should_setup_billing = False
         elif self.plan.is_metered_billing:
-            subscription_id, _ = create_subscription(
-                price_id=self.plan.price_id, customer_id=self.stripe_customer_id,
-            )
+            subscription_id, _ = create_subscription(price_id=self.plan.price_id, customer_id=self.stripe_customer_id,)
             self.stripe_subscription_item_id = subscription_id
             self.should_setup_billing = False
         self.save()

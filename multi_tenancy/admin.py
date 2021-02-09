@@ -32,6 +32,7 @@ class PlanAdmin(admin.ModelAdmin):
         "is_active",
         "self_serve",
         "event_allowance",
+        "price_string",
     )
 
     def get_queryset(self, request):

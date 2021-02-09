@@ -33,23 +33,17 @@ class MultiTenancyOrgSignupSerializer(OrganizationSignupSerializer):
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)
 
-        process_organization_signup_messaging.delay(
-            user_id=user.pk, organization_id=str(self._organization.id)
-        )
+        process_organization_signup_messaging.delay(user_id=user.pk, organization_id=str(self._organization.id))
 
         if plan:
             OrganizationBilling.objects.create(
-                organization=self._organization,
-                plan=plan,
-                should_setup_billing=plan.default_should_setup_billing,
+                organization=self._organization, plan=plan, should_setup_billing=plan.default_should_setup_billing,
             )
 
         return user
 
 
 class PlanSerializer(ReadOnlySerializer):
-    allowance = serializers.SerializerMethodField()
-
     class Meta:
         model = Plan
         fields = [
@@ -60,15 +54,8 @@ class PlanSerializer(ReadOnlySerializer):
             "image_url",
             "self_serve",
             "is_metered_billing",
+            "price_string",
         ]
-
-    def get_allowance(self, obj: Plan) -> Optional[Dict]:
-        if not obj.event_allowance:
-            return None
-        return {
-            "value": obj.event_allowance,
-            "formatted": compact_number(obj.event_allowance),
-        }
 
 
 class BillingSubscribeSerializer(serializers.Serializer):
@@ -86,9 +73,7 @@ class BillingSubscribeSerializer(serializers.Serializer):
 
         user: User = self.context["request"].user
 
-        instance, _created = OrganizationBilling.objects.get_or_create(
-            organization=user.organization,
-        )
+        instance, _ = OrganizationBilling.objects.get_or_create(organization=user.organization,)
 
         if instance.is_billing_active:
             raise serializers.ValidationError(
@@ -106,9 +91,7 @@ class BillingSubscribeSerializer(serializers.Serializer):
             checkout_session = None
 
         if not checkout_session:
-            raise serializers.ValidationError(
-                "Error starting your billing subscription. Please try again.",
-            )
+            raise serializers.ValidationError("Error starting your billing subscription. Please try again.",)
 
         instance.stripe_customer_id = customer_id
         instance.stripe_checkout_session = checkout_session
