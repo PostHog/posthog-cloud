@@ -57,20 +57,19 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(team.name, "Default Project")
 
         # Assert that the sign up event & identify calls were sent to PostHog analytics
+        analytics_props = {
+            "is_first_user": False,
+            "is_organization_first_user": True,
+            "new_onboarding_enabled": False,
+            "signup_backend_processor": "OrganizationSignupSerializer",
+            "signup_social_provider": "",
+        }
         mock_capture.assert_called_once_with(
-            user.distinct_id,
-            "user signed up",
-            properties={
-                "is_first_user": False,
-                "is_organization_first_user": True,
-                "new_onboarding_enabled": False,
-                "signup_backend_processor": "OrganizationSignupSerializer",
-                "signup_social_provider": "",
-            },
+            user.distinct_id, "user signed up", properties=analytics_props,
         )
 
         mock_identify.assert_called_once_with(
-            user.distinct_id, {"is_first_user": False, "is_organization_first_user": True},
+            user.distinct_id, analytics_props,
         )
 
         # Assert that the user is logged in
