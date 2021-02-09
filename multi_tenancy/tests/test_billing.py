@@ -288,7 +288,6 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "self_serve": False,
                 "is_metered_billing": False,
                 "price_string": "",
-                "description": {},
             },
         )
 
@@ -355,7 +354,6 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "self_serve": False,
                 "is_metered_billing": False,
                 "price_string": "",
-                "description": {},
             },
         )
 
@@ -376,18 +374,13 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         (only card setup for future usage is set up at this stage; no subscription is created)
         """
 
-        description_example = {
-            "benefits": ["**Unlimited** everything", "Priority support"],
-            "disclaimers": ["Data may be moved to cold storage after 12 months."],
-        }
-
         mock_customer_id.return_value = "cus_000111222"
         mock_cs_session = MagicMock()
         mock_cs_session.id = "cs_usage_1234567890"
 
         mock_checkout.return_value = mock_cs_session
         organization, team, user = self.create_org_team_user()
-        plan = self.create_plan(key="usage1", is_metered_billing=True, description=description_example)
+        plan = self.create_plan(key="usage1", is_metered_billing=True)
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
         )
@@ -427,7 +420,6 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "self_serve": False,
                 "is_metered_billing": True,
                 "price_string": "",
-                "description": description_example,
             },
         )
 
@@ -533,7 +525,6 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "self_serve": True,
                 "is_metered_billing": False,
                 "price_string": "",
-                "description": {},
             },
         )
 
@@ -722,7 +713,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(org_billing.checkout_session_created_at, None)
 
 
-class PlanTestCase(APIBaseTest, PlanTestMixin):
+class PlanAPITestCase(APIBaseTest, PlanTestMixin):
     def setUp(self):
         super().setUp()
 
@@ -753,7 +744,6 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "self_serve",
                     "is_metered_billing",
                     "price_string",
-                    "description",
                 ],
             )
 
@@ -789,7 +779,6 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
                     "self_serve",
                     "is_metered_billing",
                     "price_string",
-                    "description",
                 ],
             )
             self.assertEqual(obj.self_serve, True)
@@ -800,6 +789,42 @@ class PlanTestCase(APIBaseTest, PlanTestMixin):
         self.assertEqual(
             response.json(), {"attr": None, "code": "not_found", "detail": "Not found.", "type": "invalid_request",},
         )
+
+    def test_get_plan_template(self):
+        """
+        Tests that anyone can obtain the plan details.
+        """
+        self.create_plan(key="starter")
+        self.client.logout()
+
+        f = open("multi_tenancy/templates/plans/starter.html", "r")
+        expected = f.read()
+        f.close()
+
+        response = self.client.get("/plans/starter/template/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.content.decode(), expected)
+
+    def test_empty_template_for_plan_or_inexistent_plan(self):
+
+        self.client.logout()
+
+        # Plan has no template
+        self.create_plan(key="new_plan")
+        response = self.client.get("/plans/new_plan/template/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.content.decode(), "")
+
+        # Plan is not active
+        self.create_plan(key="starter", is_active=False)
+        response = self.client.get("/plans/new_plan/template/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.content.decode(), "")
+
+        # Plan does not exist
+        response = self.client.get("/plans/im_inavlid/template/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.content.decode(), "")
 
     def test_cannot_update_plans(self):
         plan = self.create_plan()
