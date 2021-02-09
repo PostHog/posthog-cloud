@@ -35,4 +35,6 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 BILLING_TRIAL_DAYS = os.environ.get("BILLING_TRIAL_DAYS", 0)
 
+BILLING_NO_PLAN_EVENT_ALLOCATION = os.environ.get("BILLING_NO_PLAN_EVENT_ALLOCATION", None)
+
 MIDDLEWARE.append('multi_tenancy.middleware.PosthogTokenCookieMiddleware')

@@ -4,11 +4,14 @@ import logging
 from distutils.util import strtobool
 from typing import Dict, Optional
 
+import posthoganalytics
 import pytz
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
+from django.template.exceptions import TemplateDoesNotExist
+from django.template.loader import get_template
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from posthog.api.organization import OrganizationSignupViewset
@@ -22,11 +25,7 @@ from sentry_sdk import capture_exception, capture_message
 import stripe
 
 from .models import OrganizationBilling, Plan
-from .serializers import (
-    BillingSubscribeSerializer,
-    MultiTenancyOrgSignupSerializer,
-    PlanSerializer,
-)
+from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -64,13 +63,13 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200 and request.user.organization:
-        instance, _created = OrganizationBilling.objects.get_or_create(
-            organization=request.user.organization,
-        )
+        instance, _created = OrganizationBilling.objects.get_or_create(organization=request.user.organization,)
 
         output = json.loads(response.content)
+
         output["billing"] = {
             "plan": None,
+            "event_allocation": instance.event_allocation,
         }
 
         # Obtain event usage of current organization
@@ -89,30 +88,22 @@ def user_with_billing(request: HttpRequest):
 
         if instance.plan:
             plan_serializer = PlanSerializer()
-            output["billing"]["plan"] = plan_serializer.to_representation(
-                instance=instance.plan,
-            )
+            output["billing"]["plan"] = plan_serializer.to_representation(instance=instance.plan,)
 
             if instance.should_setup_billing and not instance.is_billing_active:
 
                 if (
                     instance.stripe_checkout_session
                     and instance.checkout_session_created_at
-                    and instance.checkout_session_created_at
-                    + timezone.timedelta(minutes=1439)
-                    > timezone.now()
+                    and instance.checkout_session_created_at + timezone.timedelta(minutes=1439) > timezone.now()
                 ):
                     # Checkout session has been created and is still active (i.e. created less than 24 hours ago)
                     checkout_session = instance.stripe_checkout_session
                 else:
 
                     try:
-                        (
-                            checkout_session,
-                            customer_id,
-                        ) = instance.create_checkout_session(
-                            user=request.user,
-                            base_url=request.build_absolute_uri("/"),
+                        (checkout_session, customer_id,) = instance.create_checkout_session(
+                            user=request.user, base_url=request.build_absolute_uri("/"),
                         )
                     except ImproperlyConfigured as e:
                         capture_exception(e)
@@ -140,27 +131,27 @@ def user_with_billing(request: HttpRequest):
 
 def stripe_checkout_view(request: HttpRequest):
     return render_template(
-        "stripe-checkout.html",
-        request,
-        {"STRIPE_PUBLISHABLE_KEY": settings.STRIPE_PUBLISHABLE_KEY},
+        "stripe-checkout.html", request, {"STRIPE_PUBLISHABLE_KEY": settings.STRIPE_PUBLISHABLE_KEY},
     )
 
 
 def stripe_billing_portal(request: HttpRequest):
+    url = ""
 
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
-    instance, created = OrganizationBilling.objects.get_or_create(
-        organization=request.user.organization,
-    )
+    instance, _ = OrganizationBilling.objects.get_or_create(organization=request.user.organization,)
 
     if instance.stripe_customer_id:
         url = customer_portal_url(instance.stripe_customer_id)
-        if url:
-            return redirect(url)
 
-    return redirect("/")
+    # Report event manually because this page doesn't load any HTML (i.e. there's no autocapture available).
+    posthoganalytics.capture(
+        request.user.distinct_id, "visited billing customer portal", {"portal_available": bool(url)},
+    )
+
+    return redirect(url or "/")
 
 
 def billing_welcome_view(request: HttpRequest):
@@ -169,9 +160,7 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            organization_billing = OrganizationBilling.objects.get(
-                stripe_checkout_session=session_id,
-            )
+            organization_billing = OrganizationBilling.objects.get(stripe_checkout_session=session_id,)
         except OrganizationBilling.DoesNotExist:
             pass
         else:
@@ -194,8 +183,7 @@ def billing_hosted_view(request: HttpRequest):
 def stripe_webhook(request: HttpRequest) -> JsonResponse:
     response: JsonResponse = JsonResponse({"success": True}, status=status.HTTP_200_OK)
     error_response: JsonResponse = JsonResponse(
-        {"success": False},
-        status=status.HTTP_400_BAD_REQUEST,
+        {"success": False}, status=status.HTTP_400_BAD_REQUEST,
     )
     signature: str = request.META.get("HTTP_STRIPE_SIGNATURE", "")
 
@@ -224,10 +212,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
 
             if instance.stripe_subscription_item_id:
                 for _item in line_items:
-                    if (
-                        instance.stripe_subscription_item_id
-                        == _item["subscription_item"]
-                    ):
+                    if instance.stripe_subscription_item_id == _item["subscription_item"]:
                         line_item = _item
 
                 if line_item is None:
@@ -250,9 +235,9 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 line_item = line_items[0]
                 instance.stripe_subscription_item_id = line_item["subscription_item"]
 
-            instance.billing_period_ends = datetime.datetime.utcfromtimestamp(
-                line_item["period"]["end"],
-            ).replace(tzinfo=pytz.utc)
+            instance.billing_period_ends = datetime.datetime.utcfromtimestamp(line_item["period"]["end"],).replace(
+                tzinfo=pytz.utc
+            )
             instance.should_setup_billing = False
 
             instance.save()
@@ -272,3 +257,23 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
         return error_response
 
     return response
+
+
+@csrf_exempt
+def plan_template(request: HttpRequest, key: str) -> HttpResponse:
+    plan: Optional[Plan] = None
+    try:
+        plan = Plan.objects.get(key=key, is_active=True)
+    except Plan.DoesNotExist:
+        pass
+
+    if not plan:
+        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
+
+    try:
+        template = get_template(f"plans/{key}.html")
+    except TemplateDoesNotExist:
+        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
+
+    html = template.render(request=request)
+    return HttpResponse(html)

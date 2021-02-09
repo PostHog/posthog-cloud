@@ -5,18 +5,10 @@ from django.urls import path, re_path
 from posthog.urls import home, opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
 
-from .views import (
-    BillingSubscribeViewset,
-    MultiTenancyOrgSignupViewset,
-    PlanViewset,
-    billing_failed_view,
-    billing_hosted_view,
-    billing_welcome_view,
-    stripe_billing_portal,
-    stripe_checkout_view,
-    stripe_webhook,
-    user_with_billing,
-)
+from .views import (BillingSubscribeViewset, MultiTenancyOrgSignupViewset,
+                    PlanViewset, billing_failed_view, billing_hosted_view,
+                    billing_welcome_view, plan_template, stripe_billing_portal,
+                    stripe_checkout_view, stripe_webhook, user_with_billing)
 
 # Include `posthog-production` override routes first
 urlpatterns: List = [
@@ -49,23 +41,10 @@ urlpatterns += [
     opt_slash_path(
         "billing/hosted", billing_hosted_view, name="billing_hosted",
     ),  # Page with success message after setting up billing for hosted plans
-    opt_slash_path(
-        "billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook",
-    ),  # Stripe Webhook
-    opt_slash_path(
-        "billing/subscribe",
-        BillingSubscribeViewset.as_view({"post": "create"}),
-        name="billing_subscribe",
-    ),
-    opt_slash_path(
-        "plans", PlanViewset.as_view({"get": "list"}), name="billing_plans",
-    ),
-    path(
-        "plans/<str:key>",
-        PlanViewset.as_view({"get": "retrieve"}),
-        name="billing_plan",
-    ),
-    re_path(
-        r"^.*", decorators.login_required(home),
-    ),  # Should always be at the very last position
+    opt_slash_path("billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"),  # Stripe Webhook
+    opt_slash_path("billing/subscribe", BillingSubscribeViewset.as_view({"post": "create"}), name="billing_subscribe"),
+    opt_slash_path("plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
+    path("plans/<str:key>/template/", plan_template, name="billing_plan_template"),
+    path("plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
+    re_path(r"^.*", decorators.login_required(home)),  # Should always be at the very last position
 ]
