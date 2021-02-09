@@ -123,7 +123,7 @@ class OrganizationBilling(models.Model):
             # No active billing plan, default to event allocation for when no billing plan is active
             no_plan_event_allocation = settings.BILLING_NO_PLAN_EVENT_ALLOCATION
 
-            if not no_plan_event_allocation:
+            if no_plan_event_allocation is None:
                 return None
 
             return {
