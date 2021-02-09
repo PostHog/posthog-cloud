@@ -83,6 +83,32 @@ class TestTeamSignup(TransactionBaseTest):
             user_id=user.id, organization_id=str(organization.id)
         )
 
+
+    @patch("messaging.tasks.process_organization_signup_messaging.delay")
+    @patch("posthoganalytics.identify")
+    @patch("posthoganalytics.capture")
+    def test_api_sign_up_existing_email(self, mock_capture, mock_identify, mock_messaging):
+        response = self.client.post(
+            "/api/signup/",
+            {
+                "first_name": "John",
+                "email": "firstuser@posthog.com",
+                "password": "notsecure",
+                "company_name": "Hedgehogs United, LLC",
+                "email_opt_in": False,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data,
+            {
+                "type": "validation_error",
+                "code": "unique",
+                "detail": "Email already in use.",
+                "attr": "email",
+            },
+        )
+
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_default_user_sign_up(self, mock_messaging, mock_capture):
