@@ -9,9 +9,7 @@ from rest_framework import status
 class TestTeamSignup(TransactionBaseTest):
     def setUp(self):
         super().setUp()
-        User.objects.create(
-            email="firstuser@posthog.com",
-        )  # to ensure consistency in tests
+        User.objects.create(email="firstuser@posthog.com",)  # to ensure consistency in tests
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
     @patch("posthoganalytics.identify")
@@ -62,12 +60,17 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            properties={
+                "is_first_user": False,
+                "is_organization_first_user": True,
+                "new_onboarding_enabled": False,
+                "signup_backend_processor": "OrganizationSignupSerializer",
+                "signup_social_provider": "",
+            },
         )
 
         mock_identify.assert_called_once_with(
-            user.distinct_id,
-            {"is_first_user": False, "is_organization_first_user": True},
+            user.distinct_id, {"is_first_user": False, "is_organization_first_user": True},
         )
 
         # Assert that the user is logged in
@@ -79,9 +82,7 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertTrue(user.check_password("notsecure"))
 
         # Check that the process_organization_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(
-            user_id=user.id, organization_id=str(organization.id)
-        )
+        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
 
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
@@ -93,12 +94,7 @@ class TestTeamSignup(TransactionBaseTest):
 
         response = self.client.post(
             "/api/signup/",
-            {
-                "first_name": "John",
-                "email": "hedgehog5@posthog.com",
-                "password": "notsecure",
-                "email_opt_in": False,
-            },
+            {"first_name": "John", "email": "hedgehog5@posthog.com", "password": "notsecure", "email_opt_in": False,},
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -112,7 +108,13 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            properties={
+                "is_first_user": False,
+                "is_organization_first_user": True,
+                "new_onboarding_enabled": False,
+                "signup_backend_processor": "OrganizationSignupSerializer",
+                "signup_social_provider": "",
+            },
         )
 
         # Assert that the user is logged in
@@ -121,18 +123,13 @@ class TestTeamSignup(TransactionBaseTest):
         self.assertEqual(response.json()["email"], "hedgehog5@posthog.com")
 
         # Check that the process_organization_signup_messaging task was fired
-        mock_messaging.assert_called_once_with(
-            user_id=user.id, organization_id=str(organization.id)
-        )
+        mock_messaging.assert_called_once_with(user_id=user.id, organization_id=str(organization.id))
 
     @patch("posthoganalytics.capture")
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
     def test_user_can_sign_up_with_a_custom_plan(self, mock_messaging, mock_capture):
         plan = Plan.objects.create(
-            key="startup",
-            default_should_setup_billing=True,
-            price_id="price_12345678",
-            name="Test Plan",
+            key="startup", default_should_setup_billing=True, price_id="price_12345678", name="Test Plan",
         )
 
         response = self.client.post(
@@ -160,15 +157,20 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.id,
-            organization_id=str(organization.id),
+            user_id=user.id, organization_id=str(organization.id),
         )
 
         # Check that we send the sign up event to PostHog analytics
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            properties={
+                "is_first_user": False,
+                "is_organization_first_user": True,
+                "new_onboarding_enabled": False,
+                "signup_backend_processor": "OrganizationSignupSerializer",
+                "signup_social_provider": "",
+            },
         )
 
     @patch("posthoganalytics.capture")
@@ -177,12 +179,7 @@ class TestTeamSignup(TransactionBaseTest):
 
         response = self.client.post(
             "/api/signup/",
-            {
-                "first_name": "Jane",
-                "email": "hedgehog6@posthog.com",
-                "password": "notsecure",
-                "plan": "NOTVALID",
-            },
+            {"first_name": "Jane", "email": "hedgehog6@posthog.com", "password": "notsecure", "plan": "NOTVALID",},
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -199,33 +196,31 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            properties={
+                "is_first_user": False,
+                "is_organization_first_user": True,
+                "new_onboarding_enabled": False,
+                "signup_backend_processor": "OrganizationSignupSerializer",
+                "signup_social_provider": "",
+            },
         )
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.pk,
-            organization_id=str(organization.id),
+            user_id=user.pk, organization_id=str(organization.id),
         )
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")
     @patch("posthoganalytics.capture")
     def test_sign_up_multiple_teams_multi_tenancy(
-        self,
-        mock_capture,
-        mock_messaging,
+        self, mock_capture, mock_messaging,
     ):
 
         # Create a user first to make sure additional users can be created
         User.objects.create(email="i_was_first@posthog.com")
 
         response = self.client.post(
-            "/api/signup/",
-            {
-                "first_name": "John",
-                "email": "multi@posthog.com",
-                "password": "eruceston",
-            },
+            "/api/signup/", {"first_name": "John", "email": "multi@posthog.com", "password": "eruceston",},
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -249,7 +244,13 @@ class TestTeamSignup(TransactionBaseTest):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "user signed up",
-            properties={"is_first_user": False, "is_organization_first_user": True},
+            properties={
+                "is_first_user": False,
+                "is_organization_first_user": True,
+                "new_onboarding_enabled": False,
+                "signup_backend_processor": "OrganizationSignupSerializer",
+                "signup_social_provider": "",
+            },
         )
 
         # Assert that the user is logged in
@@ -262,6 +263,6 @@ class TestTeamSignup(TransactionBaseTest):
 
         # Check that the process_organization_signup_messaging task was fired
         mock_messaging.assert_called_once_with(
-            user_id=user.pk,
-            organization_id=str(user.organization.id),
+            user_id=user.pk, organization_id=str(user.organization.id),
         )
+
