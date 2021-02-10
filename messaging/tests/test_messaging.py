@@ -10,10 +10,7 @@ class TestMessaging(BaseTest):
     def setUp(self):
         super().setUp()
         self.organization, self.team, self.user = User.objects.bootstrap(
-            company_name="Test",
-            email="test@posthog.com",
-            password=None,
-            first_name="John Test",
+            organization_name="Test", email="test@posthog.com", password=None, first_name="John Test",
         )
 
     def test_cannot_send_the_same_campaign_twice_to_the_same_user(self):
@@ -23,20 +20,15 @@ class TestMessaging(BaseTest):
         with self.assertRaises(IntegrityError) as e:
             UserMessagingRecord.objects.create(user=user, campaign="test_campaign")
         self.assertIn(
-            'duplicate key value violates unique constraint "messaging_usermessagingrecord',
-            str(e.exception),
+            'duplicate key value violates unique constraint "messaging_usermessagingrecord', str(e.exception),
         )
 
     def test_check_and_send_no_event_ingestion_follow_up(self):
         with self.settings(SITE_URL="https://app.posthog.com"):
-            check_and_send_no_event_ingestion_follow_up(
-                self.user.pk
-            )
+            check_and_send_no_event_ingestion_follow_up(self.user.pk)
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(
-            mail.outbox[0].subject, "Product insights with PostHog are waiting for you"
-        )
+        self.assertEqual(mail.outbox[0].subject, "Product insights with PostHog are waiting for you")
         self.assertEqual(mail.outbox[0].from_email, "PostHog Team <hey@posthog.com>")
         self.assertEqual(mail.outbox[0].to, ["John Test <test@posthog.com>"])
         self.assertIn(
@@ -52,10 +44,7 @@ class TestMessaging(BaseTest):
     def test_does_not_send_event_ingestion_email_if_any_team_has_ingested_events(self):
         # Object setup
         organization, team, user = User.objects.bootstrap(
-            company_name="Test III",
-            email="test3@posthog.com",
-            password=None,
-            first_name="John Test III",
+            organization_name="Test III", email="test3@posthog.com", password=None, first_name="John Test III",
         )
         Team.objects.create(organization=organization)
         Event.objects.create(team=team)
@@ -75,9 +64,7 @@ class TestMessaging(BaseTest):
         check_and_send_no_event_ingestion_follow_up(user.pk)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(
-        self,
-    ):
+    def test_does_not_send_event_ingestion_email_if_user_has_received_email_before(self,):
         user: User = User.objects.create(email="valid@posthog.com")
 
         for i in range(0, 3):
