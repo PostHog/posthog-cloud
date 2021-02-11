@@ -9,12 +9,7 @@ if INSTALLED_APPS and isinstance(INSTALLED_APPS, list):
     INSTALLED_APPS.append("multi_tenancy.apps.MultiTenancyConfig")
     INSTALLED_APPS.append("messaging.apps.MessagingConfig")
 
-if (
-    TEMPLATES
-    and TEMPLATES[0]
-    and TEMPLATES[0]["DIRS"]
-    and isinstance(TEMPLATES[0]["DIRS"], list)
-):
+if TEMPLATES and TEMPLATES[0] and TEMPLATES[0]["DIRS"] and isinstance(TEMPLATES[0]["DIRS"], list):
 
     TEMPLATES[0]["DIRS"].insert(0, "multi_tenancy/templates")
 
@@ -34,4 +29,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 # https://github.com/posthog/posthog-production
 
 BILLING_TRIAL_DAYS = int(os.environ.get("BILLING_TRIAL_DAYS", 0))
-BILLING_NO_PLAN_EVENT_ALLOCATION = int(os.environ.get("BILLING_NO_PLAN_EVENT_ALLOCATION", None))
+billing_no_plan_event_allocation = os.environ.get("BILLING_NO_PLAN_EVENT_ALLOCATION", None)
+BILLING_NO_PLAN_EVENT_ALLOCATION = (
+    int(billing_no_plan_event_allocation) if billing_no_plan_event_allocation is not None else None
+)
