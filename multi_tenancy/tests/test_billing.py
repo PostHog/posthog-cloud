@@ -794,14 +794,14 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
         """
         Tests that anyone can obtain the plan details.
         """
-        self.create_plan(key="starter")
+        self.create_plan(key="standard")
         self.client.logout()
 
-        f = open("multi_tenancy/templates/plans/starter.html", "r")
+        f = open("multi_tenancy/templates/plans/standard.html", "r")
         expected = f.read()
         f.close()
 
-        response = self.client.get("/plans/starter/template/")
+        response = self.client.get("/plans/standard/template/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.content.decode(), expected)
 
