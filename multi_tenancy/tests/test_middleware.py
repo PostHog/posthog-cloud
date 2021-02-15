@@ -1,3 +1,6 @@
+import json
+from urllib.parse import quote
+
 from posthog.api.test.base import APIBaseTest
 from rest_framework import status
 
@@ -35,6 +38,42 @@ class TestPostHogTokenCookieMiddleware(APIBaseTest):
         self.assertEqual(ph_project_name_cookie["secure"], True)
         self.assertEqual(ph_project_name_cookie["max-age"], 31536000)
 
+    def test_ph_project_cookies_are_not_set_on_capture_or_api_endpoints(self):
+        self.client.logout()
+
+        data = {
+            "event": "user did custom action",
+            "properties": {"distinct_id": 2, "token": self.team.api_token},
+        }
+
+        response = self.client.get(
+            "/e/?data=%s" % quote(json.dumps(data)), content_type="application/json", HTTP_ORIGIN="https://localhost",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, len(response.cookies))  # no cookies are set
+
+        response = self.client.post(
+            "/track/",
+            data={
+                "data": json.dumps(
+                    [{"event": "beep", "properties": {"distinct_id": "eeee", "token": self.team.api_token}}],
+                ),
+                "api_key": self.team.api_token,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, len(response.cookies))  # no cookies are set
+
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/user/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, len(response.cookies))  # no cookies are set
+
+        response = self.client.patch("/api/user/", {"first_name": "Alice"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(0, len(response.cookies))  # no cookies are set
+
     def test_logout(self):
         self.client.force_login(self.user)
         response = self.client.get("/")
@@ -51,4 +90,3 @@ class TestPostHogTokenCookieMiddleware(APIBaseTest):
         response = self.client.get("/logout")
         self.assertEqual("ph_current_project_token" in response.cookies, False)
         self.assertEqual("ph_current_project_name" in response.cookies, False)
-

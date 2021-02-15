@@ -13,6 +13,10 @@ api_paths = {"e", "s", "capture", "batch", "decide", "api", "track"}
 
 
 class PostHogTokenCookieMiddleware(SessionMiddleware):
+    """
+    Adds two secure cookies to enable auto-filling the current project token on the docs.
+    """
+
     def process_response(self, request, response):
         response = super().process_response(request, response)
 
@@ -34,7 +38,7 @@ class PostHogTokenCookieMiddleware(SessionMiddleware):
             )
 
             response.set_cookie(
-                key="ph_current_project_name",  # needed to tell users what token they are seeing
+                key="ph_current_project_name",  # clarify which project is active (orgs can have multiple projects)
                 value=request.user.team.name,
                 max_age=365 * 24 * 60 * 60,
                 expires=default_cookie_options["expires"],
