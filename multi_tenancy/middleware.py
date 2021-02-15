@@ -12,9 +12,9 @@ default_cookie_options = {
 api_paths = {"e", "s", "capture", "batch", "decide", "api", "track"}
 
 
-class PosthogTokenCookieMiddleware(SessionMiddleware):
+class PostHogTokenCookieMiddleware(SessionMiddleware):
     def process_response(self, request, response):
-        response = super(PosthogTokenCookieMiddleware, self).process_response(request, response)
+        response = super().process_response(request, response)
 
         # skip adding the cookie on API requests
         split_request_path = request.path.split("/")

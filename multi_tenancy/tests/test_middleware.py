@@ -1,20 +1,17 @@
-from django.conf import settings
-from django.test import Client, TestCase
-from posthog.test.base import BaseTest
+from posthog.api.test.base import APIBaseTest
 from rest_framework import status
 
 
-class TestPosthogTokenCookieMiddleware(BaseTest):
-    TESTS_API = True
-    TESTS_FORCE_LOGIN = False
-
+class TestPostHogTokenCookieMiddleware(APIBaseTest):
     def test_logged_out_client(self):
+        self.client.logout()
         response = self.client.get("/")
         self.assertEqual(0, len(response.cookies))
 
     def test_logged_in_client(self):
         self.client.force_login(self.user)
         response = self.client.get("/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         ph_project_token_cookie = response.cookies["ph_current_project_token"]
         self.assertEqual(ph_project_token_cookie.key, "ph_current_project_token")
@@ -41,6 +38,8 @@ class TestPosthogTokenCookieMiddleware(BaseTest):
     def test_logout(self):
         self.client.force_login(self.user)
         response = self.client.get("/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         self.assertEqual(response.cookies["ph_current_project_token"].key, "ph_current_project_token")
         self.assertEqual(response.cookies["ph_current_project_token"].value, self.user.team.api_token)
         self.assertEqual(response.cookies["ph_current_project_token"]["max-age"], 31536000)
