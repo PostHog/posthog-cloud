@@ -29,6 +29,11 @@ class MultiTenancyOrgSignupSerializer(OrganizationSignupSerializer):
         except Plan.DoesNotExist:
             return None
 
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Email already in use.", code="unique")
+        return value
+
     def create(self, validated_data: Dict) -> User:
         plan = validated_data.pop("plan", None)
         user = super().create(validated_data)

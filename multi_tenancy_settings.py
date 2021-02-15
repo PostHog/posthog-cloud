@@ -19,7 +19,7 @@ if (
     TEMPLATES[0]["DIRS"].insert(0, "multi_tenancy/templates")
 
 
-EVENT_USAGE_CACHING_TTL = int(os.environ.get("EVENT_USAGE_CACHING_TTL", 12 * 60 * 60))
+EVENT_USAGE_CACHING_TTL = get_from_env("EVENT_USAGE_CACHING_TTL", 12 * 60 * 60, type_cast=int)
 
 
 # Stripe settings
@@ -33,8 +33,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 # Business rules
 # https://github.com/posthog/posthog-production
 
-BILLING_TRIAL_DAYS = os.environ.get("BILLING_TRIAL_DAYS", 0)
-
-BILLING_NO_PLAN_EVENT_ALLOCATION = os.environ.get("BILLING_NO_PLAN_EVENT_ALLOCATION", None)
+BILLING_TRIAL_DAYS = get_from_env("BILLING_TRIAL_DAYS", 0, type_cast=int)
+BILLING_NO_PLAN_EVENT_ALLOCATION = get_from_env("BILLING_NO_PLAN_EVENT_ALLOCATION", optional=True, type_cast=int)
 
 MIDDLEWARE.append('multi_tenancy.middleware.PosthogTokenCookieMiddleware')

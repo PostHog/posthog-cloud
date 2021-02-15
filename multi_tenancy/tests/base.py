@@ -27,7 +27,7 @@ class FactoryMixin:
 class PlanTestMixin:
     def create_org_team_user(self):
         return User.objects.bootstrap(
-            company_name="Z",
+            organization_name="Z",
             first_name="X",
             email=f"user{random.randint(100, 999)}@posthog.com",
             password=self.TESTS_PASSWORD,
