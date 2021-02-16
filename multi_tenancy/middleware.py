@@ -25,7 +25,7 @@ class PostHogTokenCookieMiddleware(SessionMiddleware):
         if len(split_request_path) and split_request_path[1] in api_paths:
             return response
 
-        if request.user and request.user.is_authenticated:
+        if request.user and request.user.is_authenticated and request.user.team:
             response.set_cookie(
                 key="ph_current_project_token",
                 value=request.user.team.api_token,
