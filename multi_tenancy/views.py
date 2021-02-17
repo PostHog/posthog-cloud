@@ -63,7 +63,7 @@ def user_with_billing(request: HttpRequest):
     response = user(request)
 
     if response.status_code == 200 and request.user.organization:
-        instance, _created = OrganizationBilling.objects.get_or_create(organization=request.user.organization,)
+        instance, _ = OrganizationBilling.objects.get_or_create(organization=request.user.organization,)
 
         output = json.loads(response.content)
 
@@ -80,11 +80,7 @@ def user_with_billing(request: HttpRequest):
         except Exception as e:
             capture_exception(e)
 
-        if event_usage is not None:
-            output["billing"]["current_usage"] = {
-                "value": event_usage,
-                "formatted": compact_number(event_usage),
-            }
+        output["billing"]["current_usage"] = event_usage
 
         if instance.plan:
             plan_serializer = PlanSerializer()
