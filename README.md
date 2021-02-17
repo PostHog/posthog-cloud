@@ -6,7 +6,7 @@ NOTE: This repository **is copyrighted** (unlike our [main repo](https://github.
 
 ## Current Infrastructure
 
-![Infra Diagram](https://github.com/posthog/posthog-production/blob/master/docs/images/infra.png?raw=true)
+![Infra Diagram](docs/images/infra.png?raw=true)
 
 ## Structure
 
