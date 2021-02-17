@@ -55,19 +55,6 @@ class Plan(models.Model):
     def __str__(self) -> str:
         return self.name
 
-    @property
-    def allowance(self) -> Optional[Dict[str, Union[str, int]]]:
-        """
-        Formatted event allowance.
-        """
-        if not self.event_allowance:
-            return None
-
-        return {
-            "value": self.event_allowance,
-            "formatted": compact_number(self.event_allowance),
-        }
-
 
 class OrganizationBilling(models.Model):
     """An extension to Organization for handling PostHog Cloud billing."""

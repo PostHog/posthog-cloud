@@ -55,7 +55,7 @@ class PlanSerializer(ReadOnlySerializer):
             "key",
             "name",
             "custom_setup_billing_message",
-            "allowance",
+            "event_allowance",
             "image_url",
             "self_serve",
             "is_metered_billing",

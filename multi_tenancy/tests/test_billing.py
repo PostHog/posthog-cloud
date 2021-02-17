@@ -283,7 +283,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "key": plan.key,
                 "name": plan.name,
                 "custom_setup_billing_message": "Sign up now!",
-                "allowance": {"value": 50000, "formatted": "50K"},
+                "event_allowance": 50000,
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": False,
@@ -349,7 +349,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "key": "startup",
                 "name": plan.name,
                 "custom_setup_billing_message": "",
-                "allowance": None,
+                "event_allowance": None,
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": False,
@@ -415,7 +415,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "key": "usage1",
                 "name": plan.name,
                 "custom_setup_billing_message": "",
-                "allowance": None,
+                "event_allowance": None,
                 "image_url": "",
                 "self_serve": False,
                 "is_metered_billing": True,
@@ -520,7 +520,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
                 "key": plan.key,
                 "name": plan.name,
                 "custom_setup_billing_message": "",
-                "allowance": {"value": 8500000, "formatted": "8.5M"},
+                "event_allowance": 8500000,
                 "image_url": "http://test.posthog.com/image.png",
                 "self_serve": True,
                 "is_metered_billing": False,
@@ -739,7 +739,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
                     "key",
                     "name",
                     "custom_setup_billing_message",
-                    "allowance",
+                    "event_allowance",
                     "image_url",
                     "self_serve",
                     "is_metered_billing",
@@ -747,10 +747,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
                 ],
             )
 
-            if obj.event_allowance:
-                self.assertEqual(
-                    item["allowance"], {"value": 49334, "formatted": "49.3K"},
-                )
+            self.assertEqual(item["event_allowance"], 49334)
 
             retrieve_response = self.client.get(f"/plans/{obj.key}")
             self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
@@ -774,7 +771,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
                     "key",
                     "name",
                     "custom_setup_billing_message",
-                    "allowance",
+                    "event_allowance",
                     "image_url",
                     "self_serve",
                     "is_metered_billing",
