@@ -161,20 +161,20 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
         self.assertEqual(billing.event_allocation, None)
 
         with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
-            self.assertEqual(billing.event_allocation, {"value": 133, "formatted": "133"})
+            self.assertEqual(billing.event_allocation, 133)
 
         # Still defaults to no plan allocation because plan is not active
         plan = self.create_plan(key="starter", event_allowance=7777)
         billing.plan = plan
         billing.save()
         with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
-            self.assertEqual(billing.event_allocation, {"value": 133, "formatted": "133"})
+            self.assertEqual(billing.event_allocation, 133)
 
         # Plan is now active
         billing.billing_period_ends = timezone.now() + datetime.timedelta(days=4)
         billing.save()
         with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=133):
-            self.assertEqual(billing.event_allocation, {"value": 7777, "formatted": "7.7K"})
+            self.assertEqual(billing.event_allocation, 7777)
 
 
 class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
@@ -191,8 +191,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"],
-            {"plan": None, "current_usage": {"formatted": "0", "value": 0}, "event_allocation": None},
+            response_data["billing"], {"plan": None, "current_usage": 0, "event_allocation": None},
         )
 
         # OrganizationBilling object should've been created if non-existent
@@ -213,12 +212,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"],
-            {
-                "plan": None,
-                "current_usage": {"formatted": "0", "value": 0},
-                "event_allocation": {"formatted": "7.5K", "value": 7500},
-            },
+            response_data["billing"], {"plan": None, "current_usage": 0, "event_allocation": 7500},
         )
 
     def test_team_that_should_not_set_up_billing(self):
@@ -239,8 +233,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"],
-            {"plan": None, "current_usage": {"value": 3, "formatted": "3"}, "event_allocation": None},
+            response_data["billing"], {"plan": None, "current_usage": 3, "event_allocation": None},
         )
 
     @patch("multi_tenancy.stripe._get_customer_id")
@@ -565,8 +558,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"],
-            {"plan": None, "event_allocation": None, "current_usage": {"value": 4831, "formatted": "4.8K"}},
+            response_data["billing"], {"plan": None, "event_allocation": None, "current_usage": 4831},
         )
 
     @freeze_time("2018-12-31T22:59:59.000000Z")
@@ -582,7 +574,7 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
 
         response = self.client.post("/api/user/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["billing"]["current_usage"]["value"], 3)
+        self.assertEqual(response.json()["billing"]["current_usage"], 3)
 
         # Check that result was cached
         cache_key = f"monthly_usage_{organization.id}"
@@ -747,7 +739,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
                 ],
             )
 
-            self.assertEqual(item["event_allowance"], 49334)
+            self.assertEqual(item["event_allowance"], 49334 if obj.event_allowance else None)
 
             retrieve_response = self.client.get(f"/plans/{obj.key}")
             self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
