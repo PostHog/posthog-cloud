@@ -724,7 +724,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
         self.create_plan(event_allowance=49334, self_serve=True)
 
     def test_listing_and_retrieving_plans(self):
-        response = self.client.get("/plans")
+        response = self.client.get("/api/plans")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.data["count"], Plan.objects.exclude(is_active=False).count(),
@@ -752,14 +752,14 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
                     item["allowance"], {"value": 49334, "formatted": "49.3K"},
                 )
 
-            retrieve_response = self.client.get(f"/plans/{obj.key}")
+            retrieve_response = self.client.get(f"/api/plans/{obj.key}")
             self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
             self.assertEqual(
                 retrieve_response.data, item,
             )  # Retrieve response is equal to list response
 
     def test_list_self_serve_plans(self):
-        response = self.client.get("/plans?self_serve=1")
+        response = self.client.get("/api/plans?self_serve=1")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.data["count"], Plan.objects.exclude(is_active=False).exclude(self_serve=False).count(),
@@ -785,7 +785,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
 
     def test_inactive_plans_cannot_be_retrieved(self):
         plan = self.create_plan(is_active=False)
-        response = self.client.get(f"/plans/{plan.key}")
+        response = self.client.get(f"/api/plans/{plan.key}")
         self.assertEqual(
             response.json(), {"attr": None, "code": "not_found", "detail": "Not found.", "type": "invalid_request",},
         )
@@ -801,7 +801,7 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
         expected = f.read()
         f.close()
 
-        response = self.client.get("/plans/standard/template/")
+        response = self.client.get("/api/plans/standard/template/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.content.decode(), expected)
 
@@ -811,18 +811,18 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
 
         # Plan has no template
         self.create_plan(key="new_plan")
-        response = self.client.get("/plans/new_plan/template/")
+        response = self.client.get("/api/plans/new_plan/template/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.content.decode(), "")
 
         # Plan is not active
         self.create_plan(key="starter", is_active=False)
-        response = self.client.get("/plans/new_plan/template/")
+        response = self.client.get("/api/plans/new_plan/template/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.content.decode(), "")
 
         # Plan does not exist
-        response = self.client.get("/plans/im_inavlid/template/")
+        response = self.client.get("/api/plans/im_inavlid/template/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.content.decode(), "")
 
@@ -830,13 +830,13 @@ class PlanAPITestCase(APIBaseTest, PlanTestMixin):
         plan = self.create_plan()
 
         # PUT UPDATE
-        response = self.client.put(f"/plans/{plan.key}", {"price_id": "new_pricing"})
+        response = self.client.put(f"/api/plans/{plan.key}", {"price_id": "new_pricing"})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
         plan.refresh_from_db()
         self.assertNotEqual(plan.price_id, "new_pricing")
 
         # PATCH UPDATE
-        response = self.client.patch(f"/plans/{plan.key}", {"price_id": "new_pricing"})
+        response = self.client.patch(f"/api/plans/{plan.key}", {"price_id": "new_pricing"})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
         plan.refresh_from_db()
         self.assertNotEqual(plan.price_id, "new_pricing")
