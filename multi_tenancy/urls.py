@@ -27,6 +27,9 @@ urlpatterns: List = [
     opt_slash_path(
         "api/signup", MultiTenancyOrgSignupViewset.as_view(),
     ),  # Override to support setting a billing plan on signup
+    opt_slash_path("api/plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
+    path("api/plans/<str:key>/template/", plan_template, name="billing_plan_template"),
+    path("api/plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
 ]
 
 # Include `posthog` default routes, except the home route (to give precendence to billing routes)
@@ -52,8 +55,5 @@ urlpatterns += [
     ),  # Page with success message after setting up billing for hosted plans
     opt_slash_path("billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"),  # Stripe Webhook
     opt_slash_path("billing/subscribe", BillingSubscribeViewset.as_view({"post": "create"}), name="billing_subscribe"),
-    opt_slash_path("api/plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
-    path("api/plans/<str:key>/template/", plan_template, name="billing_plan_template"),
-    path("api/plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
     re_path(r"^.*", decorators.login_required(home)),  # Should always be at the very last position
 ]
