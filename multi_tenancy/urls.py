@@ -53,7 +53,7 @@ urlpatterns += [
     opt_slash_path("billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"),  # Stripe Webhook
     opt_slash_path("billing/subscribe", BillingSubscribeViewset.as_view({"post": "create"}), name="billing_subscribe"),
     opt_slash_path("api/plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
-    path("plans/<str:key>/template/", plan_template, name="billing_plan_template"),
-    path("plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
+    path("api/plans/<str:key>/template/", plan_template, name="billing_plan_template"),
+    path("api/plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
     re_path(r"^.*", decorators.login_required(home)),  # Should always be at the very last position
 ]
