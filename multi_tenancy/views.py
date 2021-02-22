@@ -23,12 +23,10 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
-from multi_tenancy.tasks import (report_card_validated,
-                                 report_invoice_payment_succeeded)
+from multi_tenancy.tasks import report_card_validated, report_invoice_payment_succeeded
 
 from .models import OrganizationBilling, Plan
-from .serializers import (BillingSubscribeSerializer,
-                          MultiTenancyOrgSignupSerializer, PlanSerializer)
+from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -241,19 +239,15 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 tzinfo=pytz.utc,
             )
             instance.should_setup_billing = False
+            instance.save()
 
             report_invoice_payment_succeeded.delay(
-                organization_id=instance.id,
-                initial=is_billing_inception,
-                plan_key=instance.plan.key,
-                billing_period_ends=instance.billing_period_ends,
+                organization_id=instance.organization.id, initial=is_billing_inception,
             )
-
-            instance.save()
 
         # Special handling for plans that only do card validation (e.g. startup or metered-billing plans)
         elif event["type"] == "payment_intent.amount_capturable_updated":
-            instance.handle_post_card_validation()
+            instance = instance.handle_post_card_validation()
 
             # Attempt to cancel the validation charge
             try:
@@ -261,11 +255,7 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             except stripe.error.StripeError as e:
                 capture_exception(e)
 
-            report_card_validated(
-                organization_id=instance.id,
-                plan_key=instance.plan.key,
-                billing_period_ends=instance.billing_period_ends,
-            )
+            report_card_validated(organization_id=instance.organization.id)
 
     except KeyError:
         # Malformed request

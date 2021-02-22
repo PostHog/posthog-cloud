@@ -7,7 +7,8 @@ from django.utils import timezone
 from posthog.models import Organization, User
 from posthog.templatetags.posthog_filters import compact_number
 
-from .stripe import create_subscription, create_subscription_checkout_session, create_zero_auth
+from .stripe import (create_subscription, create_subscription_checkout_session,
+                     create_zero_auth)
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -136,7 +137,7 @@ class OrganizationBilling(models.Model):
             email=user.email, base_url=base_url, price_id=self.plan.price_id, customer_id=self.stripe_customer_id,
         )
 
-    def handle_post_card_validation(self) -> None:
+    def handle_post_card_validation(self) -> "OrganizationBilling":
         """
         Handles logic after a card has been validated.
         """
@@ -148,3 +149,4 @@ class OrganizationBilling(models.Model):
             self.stripe_subscription_item_id = subscription_id
             self.should_setup_billing = False
         self.save()
+        return self
