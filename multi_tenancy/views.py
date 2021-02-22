@@ -23,9 +23,12 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
+from multi_tenancy.tasks import (report_card_validated,
+                                 report_invoice_payment_succeeded)
 
 from .models import OrganizationBilling, Plan
-from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
+from .serializers import (BillingSubscribeSerializer,
+                          MultiTenancyOrgSignupSerializer, PlanSerializer)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -205,6 +208,9 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             # Stripe sets period_end = period_start because they manage these attributes on an accrual-basis
             line_items = event["data"]["object"]["lines"]["data"]
             line_item = None
+            is_billing_inception = (
+                not instance.billing_period_ends
+            )  # first time (or reactivation) of billing agreement (i.e. not continuing use)
 
             if instance.stripe_subscription_item_id:
                 for _item in line_items:
@@ -232,9 +238,16 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 instance.stripe_subscription_item_id = line_item["subscription_item"]
 
             instance.billing_period_ends = datetime.datetime.utcfromtimestamp(line_item["period"]["end"],).replace(
-                tzinfo=pytz.utc
+                tzinfo=pytz.utc,
             )
             instance.should_setup_billing = False
+
+            report_invoice_payment_succeeded.delay(
+                organization_id=instance.id,
+                initial=is_billing_inception,
+                plan_key=instance.plan.key,
+                billing_period_ends=instance.billing_period_ends,
+            )
 
             instance.save()
 
@@ -247,6 +260,12 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 cancel_payment_intent(event["data"]["object"]["id"])
             except stripe.error.StripeError as e:
                 capture_exception(e)
+
+            report_card_validated(
+                organization_id=instance.id,
+                plan_key=instance.plan.key,
+                billing_period_ends=instance.billing_period_ends,
+            )
 
     except KeyError:
         # Malformed request
