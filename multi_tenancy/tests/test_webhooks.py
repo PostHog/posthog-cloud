@@ -123,6 +123,87 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
         )
 
     @patch("posthoganalytics.capture")
+    def test_update_billing_period_for_existing_subscription(self, mock_capture):
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+        plan = Plan.objects.create(key="existing_plan", name="Test Plan", price_id="price_test")
+
+        organization, _, user = self.create_org_team_user()
+        instance: OrganizationBilling = OrganizationBilling.objects.create(
+            organization=organization,
+            should_setup_billing=False,
+            stripe_customer_id="cus_xHcDNOEHbSpmq",
+            plan=plan,
+            billing_period_ends=timezone.now(),
+            stripe_subscription_item_id="si_HbSpBTL6hI03Lp",
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id": "evt_1H2FuICyh3ETxLbCJnSt7FQu",
+            "object": "event",
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "customer": "cus_xHcDNOEHbSpmq",
+                    "customer_email": "user440@posthog.com",
+                    "lines": {
+                        "object": "list",
+                            "data": [
+                            {
+                                "id": "sli_a3c2f4407d4f2f",
+                                "object": "line_item",
+                                "amount": 2900,
+                                "currency": "usd",
+                                "description": "1 × PostHog Growth Plan (at $29.00 / month)",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                },
+                                "subscription": "sub_HbSp2C2zNDnw1i",
+                                "subscription_item": "si_HbSpBTL6hI03Lp",
+                                "type": "subscription",
+                                "unique_id": "il_1H2FuFCyh3ETxLbCkOq5TZ5O"
+                            }
+                        ],
+                        "has_more": false,
+                        "total_count": 1
+                    },
+                    "paid": true,
+                    "period_end": 1594124895,
+                    "period_start": 1594124895,
+                    "status": "paid",
+                    "subscription": "sub_HbSp2C2zNDnw1i"
+                }
+            },
+            "livemode": false,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(enforce_csrf_checks=True)  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook", body, content_type="text/plain", HTTP_STRIPE_SIGNATURE=signature,
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check that the period end was updated and subscription ID saved
+        billing_period_ends = timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC)
+        instance.refresh_from_db()
+        self.assertEqual(instance.billing_period_ends, billing_period_ends)
+
+        # Assert that analytics event is fired
+        mock_capture.assert_called_once_with(
+            user.distinct_id,
+            "billing subscription paid",
+            {"plan_key": "existing_plan", "billing_period_ends": billing_period_ends},
+        )
+
+    @patch("posthoganalytics.capture")
     @patch("multi_tenancy.views.cancel_payment_intent")
     def test_billing_period_special_handling_for_startup_plan(
         self, cancel_payment_intent, mock_capture,
