@@ -119,7 +119,11 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "billing subscription activated",
-            {"plan_key": "test_plan", "billing_period_ends": billing_period_ends},
+            {
+                "plan_key": "test_plan",
+                "billing_period_ends": billing_period_ends,
+                "organization_id": str(organization.id),
+            },
         )
 
     @patch("posthoganalytics.capture")
@@ -200,7 +204,11 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
         mock_capture.assert_called_once_with(
             user.distinct_id,
             "billing subscription paid",
-            {"plan_key": "existing_plan", "billing_period_ends": billing_period_ends},
+            {
+                "plan_key": "existing_plan",
+                "billing_period_ends": billing_period_ends,
+                "organization_id": str(organization.id),
+            },
         )
 
     @patch("posthoganalytics.capture")
@@ -290,7 +298,11 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
             mock_capture.assert_any_call(
                 _user.distinct_id,
                 "billing card validated",
-                {"plan_key": "startup", "billing_period_ends": instance.billing_period_ends},
+                {
+                    "plan_key": "startup",
+                    "billing_period_ends": instance.billing_period_ends,
+                    "organization_id": str(organization.id),
+                },
             )
 
     @freeze_time("2020-11-09T14:59:30Z")
@@ -387,7 +399,9 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
 
         # Assert that special analytics event is fired
         mock_capture.assert_called_with(
-            user.distinct_id, "billing card validated", {"plan_key": "metered", "billing_period_ends": None},
+            user.distinct_id,
+            "billing card validated",
+            {"plan_key": "metered", "billing_period_ends": None, "organization_id": str(organization.id)},
         )
 
     @patch("multi_tenancy.views.capture_message")

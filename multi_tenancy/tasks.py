@@ -63,12 +63,13 @@ def report_monthly_usage(self, subscription_item_id: str, billed_usage: int, for
 
 
 @app.task(ignore_result=True, max_retries=3)
-def report_invoice_payment_succeeded(organization_id: Organization, initial: bool) -> None:
+def report_invoice_payment_succeeded(organization_id: str, initial: bool) -> None:
 
     organization = Organization.objects.get(id=organization_id)
     payload = {
         "plan_key": organization.billing.get_plan_key(only_active=False),
         "billing_period_ends": organization.billing.billing_period_ends,
+        "organization_id": str(organization.id),
     }
     event = "billing subscription activated" if initial else "billing subscription paid"
 
@@ -79,12 +80,13 @@ def report_invoice_payment_succeeded(organization_id: Organization, initial: boo
 
 
 @app.task(ignore_result=True, max_retries=3)
-def report_card_validated(organization_id: Organization) -> None:
+def report_card_validated(organization_id: str) -> None:
 
     organization = Organization.objects.get(id=organization_id)
     payload = {
         "plan_key": organization.billing.get_plan_key(only_active=False),
         "billing_period_ends": organization.billing.billing_period_ends,
+        "organization_id": str(organization.id),
     }
 
     for user in organization.members.all():
