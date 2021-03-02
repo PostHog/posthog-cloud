@@ -107,7 +107,10 @@ jobs:
           python-version: "3.8"
 
       - name: Fetch posthog main repo
-        run: bin/pull_main
+        run: |
+          bin/pull_main
+          cp deploy/ee/conftest.py messaging/conftest.py
+          cp deploy/ee/conftest.py multi_tenancy/conftest.py
 
       - name: Set up dependencies caching
         uses: actions/cache@v2
