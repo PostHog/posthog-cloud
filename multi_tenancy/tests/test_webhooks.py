@@ -358,6 +358,110 @@ class TestPaymentSucceededWebhooks(StripeWebhookTestMixin):
         # No event is reported as nothing was updated
         mock_capture.assert_not_called()
 
+    @patch("posthoganalytics.capture")
+    @patch("sentry_sdk.capture_message")
+    def test_billing_period_not_updated_if_subscription_doesnt_match(self, mock_sentry_message, mock_capture):
+        """
+        Tests the edge case (in general should never happen) when we receive invoice.payment_succeeded but the
+        subscription does not match records on file.
+        """
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+        plan = Plan.objects.create(key="flat", name="Flat Plan", price_id="price_test")
+
+        organization, _, user = self.create_org_team_user()
+        current_period_end = datetime.datetime(2020, 3, 1, 23, 59, 59, 59, tzinfo=pytz.UTC)
+        instance: OrganizationBilling = OrganizationBilling.objects.create(
+            organization=organization,
+            stripe_customer_id="cus_IuiYICjeetKPlE",
+            plan=plan,
+            billing_period_ends=current_period_end,
+            stripe_subscription_id="sub_J2iADLADfn3jSA",
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id": "evt_1H2FuICyh3ETxLbCJnSt7FQu",
+            "object": "event",
+            "created": 1594124897,
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "object": "invoice",
+                    "amount_due": 2900,
+                    "amount_paid": 2900,
+                    "created": 1594124895,
+                    "currency": "usd",
+                    "custom_fields": null,
+                    "customer": "cus_IuiYICjeetKPlE",
+                    "customer_email": "user440@posthog.com",
+                    "lines": {
+                        "object": "list",
+                            "data": [
+                            {
+                                "id": "sli_a3c2f4407d4f2f",
+                                "object": "line_item",
+                                "amount": 2900,
+                                "currency": "usd",
+                                "description": "1 × PostHog Growth Plan (at $29.00 / month)",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                },
+                                "plan": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "plan",
+                                    "nickname": null,
+                                    "product": "prod_HbBgfdauoF2CLh"
+                                },
+                                "price": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "price"
+                                },
+                                "quantity": 1,
+                                "subscription": "sub_HbSp2C2zNDnw1i",
+                                "subscription_item": "si_HbSpBTL6hI03Lp",
+                                "type": "subscription",
+                                "unique_id": "il_1H2FuFCyh3ETxLbCkOq5TZ5O"
+                            }
+                        ],
+                        "has_more": false,
+                        "total_count": 1
+                    },
+                    "next_payment_attempt": null,
+                    "number": "7069031B-0001",
+                    "paid": true,
+                    "payment_intent": "pi_1H2FuFCyh3ETxLbCjv32zPdu",
+                    "period_end": 1594124895,
+                    "period_start": 1594124895,
+                    "status": "paid",
+                    "subscription": "sub_not_a_match"
+                }
+            },
+            "livemode": false,
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(enforce_csrf_checks=True)  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook", body, content_type="text/plain", HTTP_STRIPE_SIGNATURE=signature,
+            )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        instance.refresh_from_db()
+        self.assertEqual(instance.billing_period_ends, current_period_end)  # billing period is not updated
+
+        # Error reported to Sentry
+        mock_sentry_message.assert_called_once()
+
+        # No event is reported as nothing was updated
+        mock_capture.assert_not_called()
+
 
 class TestSpecialWebhookHandling(StripeWebhookTestMixin):
     @patch("posthoganalytics.capture")
