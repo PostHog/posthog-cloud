@@ -5,7 +5,6 @@ from .models import OrganizationBilling, Plan
 
 @admin.register(OrganizationBilling)
 class OrganizationBillingAdmin(admin.ModelAdmin):
-    readonly_fields = ("stripe_checkout_session",)
     search_fields = (
         "organization__name",
         "organization__members__email",
