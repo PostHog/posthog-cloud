@@ -156,7 +156,7 @@ def billing_welcome_view(request: HttpRequest):
 
     if session_id:
         try:
-            organization_billing = OrganizationBilling.objects.get(stripe_checkout_session=session_id,)
+            organization_billing = OrganizationBilling.objects.get(stripe_checkout_session=session_id)
         except OrganizationBilling.DoesNotExist:
             pass
         else:

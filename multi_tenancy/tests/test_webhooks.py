@@ -25,12 +25,120 @@ class StripeWebhookTestMixin(TransactionBaseTest, PlanTestMixin):
         return f"t={computed_timestamp},v1={signature}"
 
 
-class TestInvoicePaymentSucceededWebhooks(StripeWebhookTestMixin):
+class TestPaymentSucceededWebhooks(StripeWebhookTestMixin):
+    @patch("posthoganalytics.capture")
+    @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
+    def test_initial_billing_period_set_from_webhook(self, mock_capture):
+        """
+        Tests initial subscription update (same behavior for flat & metered-based subscriptions).
+        """
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+        plan = Plan.objects.create(key="metered_plan", name="Test Plan", price_id="price_test", is_metered_billing=True)
+
+        organization, _, user = self.create_org_team_user()
+        instance: OrganizationBilling = OrganizationBilling.objects.create(
+            organization=organization, should_setup_billing=True, plan=plan, stripe_customer_id="cus_pxHcmaEDNOq"
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id": "evt_1H2FuICyh3ETxLbCJnSt7FQu",
+            "object": "event",
+            "created": 1594124897,
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "object": "invoice",
+                    "amount_due": 2900,
+                    "amount_paid": 2900,
+                    "created": 1594124895,
+                    "currency": "usd",
+                    "custom_fields": null,
+                    "customer": "cus_pxHcmaEDNOq",
+                    "customer_email": "user440@posthog.com",
+                    "lines": {
+                        "object": "list",
+                            "data": [
+                            {
+                                "id": "sli_a3c2f4407d4f2f",
+                                "object": "line_item",
+                                "amount": 2900,
+                                "currency": "usd",
+                                "description": "1 × PostHog Growth Plan (at $29.00 / month)",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                },
+                                "plan": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "plan",
+                                    "nickname": null,
+                                    "product": "prod_HbBgfdauoF2CLh"
+                                },
+                                "price": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "price"
+                                },
+                                "quantity": 1,
+                                "subscription": "sub_HbSp2C2zNDnw1i",
+                                "subscription_item": "si_HbSpBTL6hI03Lp",
+                                "type": "subscription",
+                                "unique_id": "il_1H2FuFCyh3ETxLbCkOq5TZ5O"
+                            }
+                        ],
+                        "has_more": false,
+                        "total_count": 1
+                    },
+                    "next_payment_attempt": null,
+                    "number": "7069031B-0001",
+                    "paid": true,
+                    "payment_intent": "pi_1H2FuFCyh3ETxLbCjv32zPdu",
+                    "period_end": 1594124895,
+                    "period_start": 1594124895,
+                    "status": "paid",
+                    "subscription": "sub_J2hjz4fq3oeYZj"
+                }
+            },
+            "livemode": false,
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(enforce_csrf_checks=True)  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook", body, content_type="text/plain", HTTP_STRIPE_SIGNATURE=signature,
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        billing_period_ends = timezone.datetime(
+            2021, 4, 2, 17, 47, 25, tzinfo=pytz.UTC,
+        )  # note this date comes from Stripe (cassette fixture in this case), not from the webhook
+        instance.refresh_from_db()
+        self.assertEqual(instance.billing_period_ends, billing_period_ends)
+        self.assertEqual(instance.stripe_subscription_id, "sub_J2hjz4fq3oeYZj")  # ID is saved too
+
+        # Assert that analytics event is fired
+        mock_capture.assert_called_once_with(
+            user.distinct_id,
+            "billing subscription activated",
+            {
+                "plan_key": "metered_plan",
+                "billing_period_ends": billing_period_ends,
+                "organization_id": str(organization.id),
+            },
+        )
+
     @patch("posthoganalytics.capture")
     @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
     def test_billing_period_is_updated_when_webhook_is_received(self, mock_capture):
         """
-        When we receive invoice.payment_succeeded webhook. We update the subscription period end.
+        When we receive invoice.payment_succeeded webhook, we update the subscription period end.
         Tests regular ongoing subscription updates (same behavior for flat & metered-based subscriptions).
         """
 
@@ -43,6 +151,7 @@ class TestInvoicePaymentSucceededWebhooks(StripeWebhookTestMixin):
             should_setup_billing=True,
             stripe_customer_id="cus_aEDNOHbSpxHcmq",
             plan=plan,
+            billing_period_ends=datetime.datetime(2020, 3, 1, 23, 59, 59, 59, tzinfo=pytz.UTC),
             stripe_subscription_id="sub_J2hjz4fq3oeYZj",
         )
 
@@ -130,13 +239,124 @@ class TestInvoicePaymentSucceededWebhooks(StripeWebhookTestMixin):
         # Assert that analytics event is fired
         mock_capture.assert_called_once_with(
             user.distinct_id,
-            "billing subscription activated",
+            "billing subscription paid",
             {
                 "plan_key": "test_plan",
                 "billing_period_ends": billing_period_ends,
                 "organization_id": str(organization.id),
             },
         )
+
+    @patch("posthoganalytics.capture")
+    @patch("multi_tenancy.tasks.capture_message")
+    @patch("multi_tenancy.tasks.update_subscription_billing_period.retry")
+    @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
+    def test_billing_period_not_updated_if_subscription_is_overdue(self, mock_retry, mock_sentry_message, mock_capture):
+        """
+        Tests the edge case (in general should never happen) when we receive invoice.payment_succeeded but the
+        subscription is overdue or cancelled on Stripe.
+        """
+
+        sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
+        plan = Plan.objects.create(key="flat", name="Flat Plan", price_id="price_test")
+
+        organization, _, user = self.create_org_team_user()
+        current_period_end = datetime.datetime(2020, 3, 1, 23, 59, 59, 59, tzinfo=pytz.UTC)
+        instance: OrganizationBilling = OrganizationBilling.objects.create(
+            organization=organization,
+            stripe_customer_id="cus_IuiYICjeetKPlE",
+            plan=plan,
+            billing_period_ends=current_period_end,
+            stripe_subscription_id="sub_J2iADLADfn3jSA",
+        )
+
+        # Note that the sample request here does not contain the entire body
+        body = """
+        {
+            "id": "evt_1H2FuICyh3ETxLbCJnSt7FQu",
+            "object": "event",
+            "created": 1594124897,
+            "data": {
+                "object": {
+                    "id": "in_1H2FuFCyh3ETxLbCNarFj00f",
+                    "object": "invoice",
+                    "amount_due": 2900,
+                    "amount_paid": 2900,
+                    "created": 1594124895,
+                    "currency": "usd",
+                    "custom_fields": null,
+                    "customer": "cus_IuiYICjeetKPlE",
+                    "customer_email": "user440@posthog.com",
+                    "lines": {
+                        "object": "list",
+                            "data": [
+                            {
+                                "id": "sli_a3c2f4407d4f2f",
+                                "object": "line_item",
+                                "amount": 2900,
+                                "currency": "usd",
+                                "description": "1 × PostHog Growth Plan (at $29.00 / month)",
+                                "period": {
+                                    "end": 1596803295,
+                                    "start": 1594124895
+                                },
+                                "plan": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "plan",
+                                    "nickname": null,
+                                    "product": "prod_HbBgfdauoF2CLh"
+                                },
+                                "price": {
+                                    "id": "price_1H1zJPCyh3ETxLbCKup83FE0",
+                                    "object": "price"
+                                },
+                                "quantity": 1,
+                                "subscription": "sub_HbSp2C2zNDnw1i",
+                                "subscription_item": "si_HbSpBTL6hI03Lp",
+                                "type": "subscription",
+                                "unique_id": "il_1H2FuFCyh3ETxLbCkOq5TZ5O"
+                            }
+                        ],
+                        "has_more": false,
+                        "total_count": 1
+                    },
+                    "next_payment_attempt": null,
+                    "number": "7069031B-0001",
+                    "paid": true,
+                    "payment_intent": "pi_1H2FuFCyh3ETxLbCjv32zPdu",
+                    "period_end": 1594124895,
+                    "period_start": 1594124895,
+                    "status": "paid",
+                    "subscription": "sub_J2iADLADfn3jSA"
+                }
+            },
+            "livemode": false,
+            "pending_webhooks": 1,
+            "type": "invoice.payment_succeeded"
+        }
+        """
+
+        signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
+        csrf_client = Client(enforce_csrf_checks=True)  # Custom client to ensure CSRF checks pass
+
+        with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
+            response = csrf_client.post(
+                "/billing/stripe_webhook", body, content_type="text/plain", HTTP_STRIPE_SIGNATURE=signature,
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        instance.refresh_from_db()
+        self.assertEqual(instance.billing_period_ends, current_period_end)  # billing period is not updated
+
+        # Task is scheduled for retry
+        mock_retry.assert_called()
+
+        # Error reported to Sentry
+        mock_sentry_message.assert_called_once_with(
+            "Received update_subscription_billing_period but subscription is not active (sub_J2iADLADfn3jSA)."
+        )
+
+        # No event is reported as nothing was updated
+        mock_capture.assert_not_called()
 
 
 class TestSpecialWebhookHandling(StripeWebhookTestMixin):

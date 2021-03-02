@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def _init_stripe() -> None:
     if not settings.STRIPE_API_KEY:
-        raise ImproperlyConfigured("Cannot process billing because env vars are not properly set.",)
+        raise ImproperlyConfigured("Cannot process billing because env vars are not properly set.")
 
     stripe.api_key = settings.STRIPE_API_KEY
 
