@@ -359,7 +359,7 @@ class TestPaymentSucceededWebhooks(StripeWebhookTestMixin):
         mock_capture.assert_not_called()
 
     @patch("posthoganalytics.capture")
-    @patch("sentry_sdk.capture_message")
+    @patch("multi_tenancy.views.capture_message")
     def test_billing_period_not_updated_if_subscription_doesnt_match(self, mock_sentry_message, mock_capture):
         """
         Tests the edge case (in general should never happen) when we receive invoice.payment_succeeded but the
