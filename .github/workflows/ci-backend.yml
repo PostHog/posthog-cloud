@@ -109,8 +109,8 @@ jobs:
       - name: Fetch posthog main repo
         run: |
           bin/pull_main
-          cp deploy/ee/conftest.py messaging/conftest.py
-          cp deploy/ee/conftest.py multi_tenancy/conftest.py
+          cp deploy/ee/conftest.py deploy/messaging/conftest.py
+          cp deploy/ee/conftest.py deploy/multi_tenancy/conftest.py
 
       - name: Set up dependencies caching
         uses: actions/cache@v2
