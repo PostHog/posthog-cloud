@@ -56,16 +56,6 @@ class Plan(models.Model):
     def __str__(self) -> str:
         return self.name
 
-    def get_next_billing_period_ends(self, period_ends: timezone.datetime) -> timezone.datetime:
-        """
-        From the current invoice's end date calculate what the billing period ends should be.
-        This accounts for the fact that standard flat-pricing plans are pre-paid while metered plans are post-paid.
-        WARNING: This assumes that we're only doing monthly-based metered-pricing.
-        """
-        if not self.is_metered_billing:
-            return period_ends
-        return period_ends + relativedelta(months=1)  # billing period covers up to next month (as it's post-paid)
-
 
 class OrganizationBilling(models.Model):
     """An extension to Organization for handling PostHog Cloud billing."""
