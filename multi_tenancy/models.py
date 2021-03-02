@@ -8,8 +8,7 @@ from django.utils import timezone
 from posthog.models import Organization, User
 from posthog.templatetags.posthog_filters import compact_number
 
-from .stripe import (create_subscription, create_subscription_checkout_session,
-                     create_zero_auth)
+from .stripe import create_subscription, create_subscription_checkout_session, create_zero_auth
 
 PLANS = {
     "starter": ["organizations_projects"],
@@ -78,9 +77,12 @@ class OrganizationBilling(models.Model):
     stripe_checkout_session: models.CharField = models.CharField(
         max_length=128, blank=True,
     )
-    stripe_subscription_item_id: models.CharField = models.CharField(
+    stripe_subscription_id: models.CharField = models.CharField(
         max_length=128, blank=True,
     )
+    stripe_subscription_item_id: models.CharField = models.CharField(
+        max_length=128, blank=True,
+    )  # DEPRECATED: We will use the subscription ID now as tiered or graduated pricing may have multiple items
     checkout_session_created_at: models.DateTimeField = models.DateTimeField(
         null=True, blank=True,
     )
