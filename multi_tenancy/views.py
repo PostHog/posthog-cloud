@@ -23,10 +23,12 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
-from multi_tenancy.tasks import report_card_validated, report_invoice_payment_succeeded
+from multi_tenancy.tasks import (report_card_validated,
+                                 report_invoice_payment_succeeded)
 
 from .models import OrganizationBilling, Plan
-from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
+from .serializers import (BillingSubscribeSerializer,
+                          MultiTenancyOrgSignupSerializer, PlanSerializer)
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
 from .utils import get_cached_monthly_event_usage
 
@@ -235,8 +237,8 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 line_item = line_items[0]
                 instance.stripe_subscription_item_id = line_item["subscription_item"]
 
-            instance.billing_period_ends = datetime.datetime.utcfromtimestamp(line_item["period"]["end"],).replace(
-                tzinfo=pytz.utc,
+            instance.billing_period_ends = instance.plan.get_next_billing_period_ends(
+                datetime.datetime.utcfromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
             )
             instance.should_setup_billing = False
             instance.save()
