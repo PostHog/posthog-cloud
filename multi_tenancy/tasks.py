@@ -3,11 +3,13 @@ from typing import Optional
 
 import dateutil
 import posthoganalytics
+import pytz
 from django.utils import timezone
 from posthog.celery import app
 from posthog.models import Organization
+from sentry_sdk.api import capture_message
 
-from multi_tenancy.stripe import report_subscription_item_usage
+from multi_tenancy.stripe import get_subscription, report_subscription_item_usage
 from multi_tenancy.utils import get_event_usage_for_timerange
 
 from .models import OrganizationBilling
@@ -93,3 +95,35 @@ def report_card_validated(organization_id: str) -> None:
         posthoganalytics.capture(
             user.distinct_id, "billing card validated", payload,
         )
+
+
+@app.task(ignore_result=True, max_retries=3)
+def update_subscription_billing_period(organization_id: str) -> None:
+    """
+    Fetches the current billing period for a subscription from Stripe and updates internal records accordingly.
+    """
+
+    organization = Organization.objects.get(id=organization_id)
+    initial_billing = (
+        not organization.billing.billing_period_ends
+    )  # first time (or reactivation) of billing agreement (i.e. not continuing use)
+
+    if not organization.billing.stripe_subscription_id:
+        raise ValueError("Invalid update_subscription_billing_period received for billing without a subscription ID.")
+
+    subscription = get_subscription(organization.billing.stripe_subscription_id)
+
+    if not subscription["status"] == "active":
+        capture_message(
+            "Received update_subscription_billing_period but subscription is"
+            f" not active ({organization.billing.stripe_subscription_id}).",
+        )
+
+    organization.billing.billing_period_ends = datetime.datetime.utcfromtimestamp(
+        subscription["current_period_end"],
+    ).replace(tzinfo=pytz.utc)
+    organization.billing.save()
+
+    report_invoice_payment_succeeded.delay(
+        organization_id=organization.id, initial=initial_billing,
+    )

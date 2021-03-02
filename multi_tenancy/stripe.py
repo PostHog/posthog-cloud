@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 
 def _init_stripe() -> None:
     if not settings.STRIPE_API_KEY:
-        raise ImproperlyConfigured(
-            "Cannot process billing because env vars are not properly set.",
-        )
+        raise ImproperlyConfigured("Cannot process billing because env vars are not properly set.",)
 
     stripe.api_key = settings.STRIPE_API_KEY
 
@@ -46,6 +44,7 @@ def create_subscription_checkout_session(
         "cancel_url": base_url + "billing/failed?session_id={CHECKOUT_SESSION_ID}",
     }
 
+    # TODO: We shouldn't do special handling for when running tests, use VCR.py to use test fixtures
     if settings.TEST:
         logger.info(f"Simulating Stripe checkout session: {payload}")
         return ("cs_1234567890", customer_id)
@@ -55,27 +54,15 @@ def create_subscription_checkout_session(
     return (session.id, customer_id)
 
 
-def create_zero_auth(
-    email: str, base_url: str, customer_id: str = "",
-) -> Tuple[str, str]:
+def create_zero_auth(email: str, base_url: str, customer_id: str = "",) -> Tuple[str, str]:
 
     customer_id = _get_customer_id(customer_id, email)
 
     payload: Dict = {
         "payment_method_types": ["card"],
-        "line_items": [
-            {
-                "amount": 50,
-                "quantity": 1,
-                "currency": "USD",
-                "name": "Card authorization",
-            },
-        ],
+        "line_items": [{"amount": 50, "quantity": 1, "currency": "USD", "name": "Card authorization",},],
         "mode": "payment",
-        "payment_intent_data": {
-            "capture_method": "manual",
-            "statement_descriptor": "POSTHOG PREAUTH",
-        },
+        "payment_intent_data": {"capture_method": "manual", "statement_descriptor": "POSTHOG PREAUTH",},
         "customer": customer_id,
         "success_url": base_url + "billing/welcome?session_id={CHECKOUT_SESSION_ID}",
         "cancel_url": base_url + "billing/failed?session_id={CHECKOUT_SESSION_ID}",
@@ -116,6 +103,7 @@ def cancel_payment_intent(payment_intent_id: str) -> None:
 def customer_portal_url(customer_id: str) -> Optional[str]:
     _init_stripe()
 
+    # TODO: We shouldn't do special handling for when running tests, use VCR.py to use test fixtures
     if settings.TEST:
         return f"/manage-my-billing/{customer_id}"
 
@@ -125,22 +113,16 @@ def customer_portal_url(customer_id: str) -> Optional[str]:
 def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:
 
     if not settings.STRIPE_WEBHOOK_SECRET:
-        raise ImproperlyConfigured(
-            "Cannot process billing webhook because env vars are not properly set.",
-        )
+        raise ImproperlyConfigured("Cannot process billing webhook because env vars are not properly set.",)
 
-    return stripe.Webhook.construct_event(
-        payload, signature, settings.STRIPE_WEBHOOK_SECRET,
-    )
+    return stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET,)
 
 
 def compute_webhook_signature(payload: str, secret: str) -> str:
     return stripe.webhook.WebhookSignature._compute_signature(payload, secret)
 
 
-def report_subscription_item_usage(
-    subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime,
-) -> bool:
+def report_subscription_item_usage(subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime,) -> bool:
     _init_stripe()
 
     # The idempotency_key is the combination of the subscription ID and current timestamp, as we should only report
@@ -152,3 +134,8 @@ def report_subscription_item_usage(
         idempotency_key=f"{subscription_item_id}-{timestamp.strftime('%Y-%m-%d')}",
     )
     return bool(usage_record.id)
+
+
+def get_subscription(subscription_id: str) -> Dict[str, Any]:
+    _init_stripe()
+    return stripe.Subscription.retrieve(subscription_id)

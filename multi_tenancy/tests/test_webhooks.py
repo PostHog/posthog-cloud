@@ -2,6 +2,7 @@ import datetime
 from unittest.mock import MagicMock, patch
 
 import pytz
+import vcr
 from django.test import Client
 from django.utils import timezone
 from freezegun.api import freeze_time
@@ -24,14 +25,22 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
         return f"t={computed_timestamp},v1={signature}"
 
     @patch("posthoganalytics.capture")
+    @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
     def test_billing_period_is_updated_when_webhook_is_received(self, mock_capture):
+        """
+        Tests regular ongoing subscription updates (same behavior for flat & metered-based subscriptions)
+        """
 
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
         plan = Plan.objects.create(key="test_plan", name="Test Plan", price_id="price_test")
 
         organization, _, user = self.create_org_team_user()
         instance: OrganizationBilling = OrganizationBilling.objects.create(
-            organization=organization, should_setup_billing=True, stripe_customer_id="cus_aEDNOHbSpxHcmq", plan=plan,
+            organization=organization,
+            should_setup_billing=True,
+            stripe_customer_id="cus_aEDNOHbSpxHcmq",
+            plan=plan,
+            stripe_subscription_id="sub_J2hjz4fq3oeYZj",
         )
 
         # Note that the sample request here does not contain the entire body
@@ -91,7 +100,7 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
                     "period_end": 1594124895,
                     "period_start": 1594124895,
                     "status": "paid",
-                    "subscription": "sub_HbSp2C2zNDnw1i"
+                    "subscription": "sub_J2hjz4fq3oeYZj"
                 }
             },
             "livemode": false,
@@ -109,11 +118,11 @@ class TestStripeWebhooks(TransactionBaseTest, PlanTestMixin):
             )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check that the period end was updated and subscription ID saved
-        billing_period_ends = timezone.datetime(2020, 8, 7, 12, 28, 15, tzinfo=pytz.UTC)
+        billing_period_ends = timezone.datetime(
+            2021, 4, 2, 17, 47, 25, tzinfo=pytz.UTC,
+        )  # note this date comes from Stripe (cassette fixture in this case), not from the webhook
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, billing_period_ends)
-        self.assertEqual(instance.stripe_subscription_item_id, "si_HbSpBTL6hI03Lp")
 
         # Assert that analytics event is fired
         mock_capture.assert_called_once_with(

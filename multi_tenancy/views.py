@@ -1,11 +1,9 @@
-import datetime
 import json
 import logging
 from distutils.util import strtobool
 from typing import Dict, Optional
 
 import posthoganalytics
-import pytz
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -16,7 +14,6 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from posthog.api.organization import OrganizationSignupViewset
 from posthog.api.user import user
-from posthog.templatetags.posthog_filters import compact_number
 from posthog.urls import render_template
 from rest_framework import mixins, status
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -24,7 +21,7 @@ from sentry_sdk import capture_exception, capture_message
 
 import stripe
 from multi_tenancy.tasks import (report_card_validated,
-                                 report_invoice_payment_succeeded)
+                                 update_subscription_billing_period)
 
 from .models import OrganizationBilling, Plan
 from .serializers import (BillingSubscribeSerializer,
@@ -205,9 +202,6 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
 
         if event["type"] == "invoice.payment_succeeded":
             subscription_id: str = event["data"]["object"]["subscription"]
-            is_billing_inception = (
-                not instance.billing_period_ends
-            )  # first time (or reactivation) of billing agreement (i.e. not continuing use)
 
             if instance.stripe_subscription_id:
                 if instance.stripe_subscription_id != subscription_id:
@@ -221,15 +215,10 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
                 # First time receiving the subscription_id, record it
                 instance.stripe_subscription_id = subscription_id
 
-            instance.billing_period_ends = instance.plan.get_next_billing_period_ends(
-                datetime.datetime.utcfromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
-            )
             instance.should_setup_billing = False
             instance.save()
 
-            report_invoice_payment_succeeded.delay(
-                organization_id=instance.organization.id, initial=is_billing_inception,
-            )
+            update_subscription_billing_period.delay(organization_id=instance.organization.id)
 
         # Special handling for plans that only do card validation (e.g. startup or metered-billing plans)
         elif event["type"] == "payment_intent.amount_capturable_updated":
