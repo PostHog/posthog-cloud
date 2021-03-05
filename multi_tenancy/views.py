@@ -20,14 +20,11 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from sentry_sdk import capture_exception, capture_message
 
 import stripe
-from multi_tenancy.tasks import (report_card_validated,
-                                 update_subscription_billing_period)
+from multi_tenancy.tasks import report_card_validated, update_subscription_billing_period
 
 from .models import OrganizationBilling, Plan
-from .serializers import (BillingSubscribeSerializer,
-                          MultiTenancyOrgSignupSerializer, PlanSerializer)
-from .stripe import (cancel_payment_intent, customer_portal_url, parse_webhook,
-                     set_default_payment_method_for_customer)
+from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
+from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook, set_default_payment_method_for_customer
 from .utils import get_cached_monthly_event_usage
 
 logger = logging.getLogger(__name__)

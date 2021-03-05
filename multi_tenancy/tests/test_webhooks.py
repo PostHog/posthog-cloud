@@ -565,7 +565,7 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
     @patch("multi_tenancy.stripe._get_customer_id")
     @patch("multi_tenancy.stripe.stripe.Subscription.create")
     @patch("multi_tenancy.views.cancel_payment_intent")
-    @patch("multi_tenancy.stripe.set_default_payment_method_for_customer")
+    @patch("stripe.Customer.modify")
     def test_handle_webhook_for_metered_plans_after_card_registration(
         self, set_default_pm, cancel_payment_intent, mock_session_create, mock_customer_id, mock_capture,
     ):
@@ -661,7 +661,9 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
             {"plan_key": "metered", "billing_period_ends": None, "organization_id": str(organization.id)},
         )
 
-        set_default_pm.assert_called_once_with("cus_MeteredI2MVxJI", "pm_iEuIaI2h3ETxMVtRXS")
+        set_default_pm.assert_called_once_with(
+            "cus_MeteredI2MVxJI", invoice_settings={"default_payment_method": "pm_iEuIaI2h3ETxMVtRXS"}
+        )
 
     @patch("multi_tenancy.views.capture_exception")
     def test_webhook_with_invalid_signature_fails(self, capture_exception):
