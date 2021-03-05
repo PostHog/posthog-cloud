@@ -26,7 +26,8 @@ from multi_tenancy.tasks import (report_card_validated,
 from .models import OrganizationBilling, Plan
 from .serializers import (BillingSubscribeSerializer,
                           MultiTenancyOrgSignupSerializer, PlanSerializer)
-from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook
+from .stripe import (cancel_payment_intent, customer_portal_url, parse_webhook,
+                     set_default_payment_method_for_customer)
 from .utils import get_cached_monthly_event_usage
 
 logger = logging.getLogger(__name__)
@@ -227,6 +228,12 @@ def stripe_webhook(request: HttpRequest) -> JsonResponse:
             # Attempt to cancel the validation charge
             try:
                 cancel_payment_intent(event["data"]["object"]["id"])
+            except stripe.error.StripeError as e:
+                capture_exception(e)
+
+            # Attempt to set the newly added card as default
+            try:
+                set_default_payment_method_for_customer(customer_id, event["data"]["object"]["payment_method"])
             except stripe.error.StripeError as e:
                 capture_exception(e)
 

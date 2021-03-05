@@ -26,8 +26,20 @@ def _get_customer_id(customer_id: str, email: str = "") -> str:
     return stripe.Customer.create(email=email).id
 
 
+def set_default_payment_method_for_customer(customer_id: str, payment_method_id: str) -> bool:
+    return (
+        stripe.Customer.modify(
+            customer_id, {"invoice_settings": {"default_payment_method": payment_method_id}}
+        ).invoice_settings["default_payment_method"]
+        == payment_method_id
+    )
+
+
 def create_subscription_checkout_session(
-    email: str, base_url: str, price_id: str = "", customer_id: str = "",
+    email: str,
+    base_url: str,
+    price_id: str = "",
+    customer_id: str = "",
 ) -> Tuple[str, str]:
     """
     Creates a checkout session for a billing subscription (used by flat-fee recurring subscriptions)
@@ -54,15 +66,29 @@ def create_subscription_checkout_session(
     return (session.id, customer_id)
 
 
-def create_zero_auth(email: str, base_url: str, customer_id: str = "",) -> Tuple[str, str]:
+def create_zero_auth(
+    email: str,
+    base_url: str,
+    customer_id: str = "",
+) -> Tuple[str, str]:
 
     customer_id = _get_customer_id(customer_id, email)
 
     payload: Dict = {
         "payment_method_types": ["card"],
-        "line_items": [{"amount": 50, "quantity": 1, "currency": "USD", "name": "Card authorization",},],
+        "line_items": [
+            {
+                "amount": 50,
+                "quantity": 1,
+                "currency": "USD",
+                "name": "Card authorization",
+            },
+        ],
         "mode": "payment",
-        "payment_intent_data": {"capture_method": "manual", "statement_descriptor": "POSTHOG PREAUTH",},
+        "payment_intent_data": {
+            "capture_method": "manual",
+            "statement_descriptor": "POSTHOG PREAUTH",
+        },
         "customer": customer_id,
         "success_url": base_url + "billing/welcome?session_id={CHECKOUT_SESSION_ID}",
         "cancel_url": base_url + "billing/failed?session_id={CHECKOUT_SESSION_ID}",
@@ -73,7 +99,10 @@ def create_zero_auth(email: str, base_url: str, customer_id: str = "",) -> Tuple
     return (session.id, customer_id)
 
 
-def create_subscription(price_id: str = "", customer_id: str = "",) -> Tuple[str, str]:
+def create_subscription(
+    price_id: str = "",
+    customer_id: str = "",
+) -> Tuple[str, str]:
     """
     Creates a subscription for an existing customer with payment details already set up. Used mainly for metered
     plans.
@@ -113,16 +142,26 @@ def customer_portal_url(customer_id: str) -> Optional[str]:
 def parse_webhook(payload: Union[bytes, str], signature: str) -> Dict:
 
     if not settings.STRIPE_WEBHOOK_SECRET:
-        raise ImproperlyConfigured("Cannot process billing webhook because env vars are not properly set.",)
+        raise ImproperlyConfigured(
+            "Cannot process billing webhook because env vars are not properly set.",
+        )
 
-    return stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET,)
+    return stripe.Webhook.construct_event(
+        payload,
+        signature,
+        settings.STRIPE_WEBHOOK_SECRET,
+    )
 
 
 def compute_webhook_signature(payload: str, secret: str) -> str:
     return stripe.webhook.WebhookSignature._compute_signature(payload, secret)
 
 
-def report_subscription_item_usage(subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime,) -> bool:
+def report_subscription_item_usage(
+    subscription_item_id: str,
+    billed_usage: int,
+    timestamp: datetime.datetime,
+) -> bool:
     _init_stripe()
 
     # The idempotency_key is the combination of the subscription ID and current timestamp, as we should only report
