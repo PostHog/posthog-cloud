@@ -466,6 +466,7 @@ class TestPaymentSucceededWebhooks(StripeWebhookTestMixin):
 class TestSpecialWebhookHandling(StripeWebhookTestMixin):
     @patch("posthoganalytics.capture")
     @patch("multi_tenancy.views.cancel_payment_intent")
+    @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
     def test_billing_period_special_handling_for_startup_plan(
         self, cancel_payment_intent, mock_capture,
     ):
@@ -475,11 +476,11 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
         organization, _, user1 = self.create_org_team_user()
         user2 = User.objects.create_user(email="test_user_2@posthog.com", first_name="Test 2", password="12345678")
         user2.join(organization=organization)
-        startup_plan = Plan.objects.create(key="startup", name="Startup", price_id="not_set",)
+        startup_plan = Plan.objects.create(key="startup", name="Startup", price_id="not_set")
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization,
             should_setup_billing=True,
-            stripe_customer_id="cus_I2maGIMVxJI",
+            stripe_customer_id="cus_IuiXChYGDqmHPi",
             plan=startup_plan,
         )
 
@@ -513,8 +514,9 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
                     "confirmation_method":"automatic",
                     "created":1600267775,
                     "currency":"usd",
-                    "customer":"cus_I2maGIMVxJI",
-                    "on_behalf_of":null
+                    "customer":"cus_IuiXChYGDqmHPi",
+                    "on_behalf_of":null,
+                    "payment_method": "card_1IRjpiEuIatRXSdzMcSSmCU9"
                 }
             },
             "livemode":false,
@@ -524,7 +526,7 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
         """
 
         signature: str = self.generate_webhook_signature(body, sample_webhook_secret)
-        csrf_client = Client(enforce_csrf_checks=True,)  # Custom client to ensure CSRF checks pass
+        csrf_client = Client(enforce_csrf_checks=True)  # Custom client to ensure CSRF checks pass
 
         with self.settings(STRIPE_WEBHOOK_SECRET=sample_webhook_secret):
 
@@ -563,8 +565,9 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
     @patch("multi_tenancy.stripe._get_customer_id")
     @patch("multi_tenancy.stripe.stripe.Subscription.create")
     @patch("multi_tenancy.views.cancel_payment_intent")
+    @patch("multi_tenancy.stripe.set_default_payment_method_for_customer")
     def test_handle_webhook_for_metered_plans_after_card_registration(
-        self, cancel_payment_intent, mock_session_create, mock_customer_id, mock_capture,
+        self, set_default_pm, cancel_payment_intent, mock_session_create, mock_customer_id, mock_capture,
     ):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
         mock_customer_id.return_value = "cus_MeteredI2MVxJI"
@@ -613,7 +616,8 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
                     "created":1600267775,
                     "currency":"usd",
                     "customer":"cus_MeteredI2MVxJI",
-                    "on_behalf_of":null
+                    "on_behalf_of":null,
+                    "payment_method": "pm_iEuIaI2h3ETxMVtRXS"
                 }
             },
             "livemode":false,
@@ -656,6 +660,8 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
             "billing card validated",
             {"plan_key": "metered", "billing_period_ends": None, "organization_id": str(organization.id)},
         )
+
+        set_default_pm.assert_called_once_with("cus_MeteredI2MVxJI", "pm_iEuIaI2h3ETxMVtRXS")
 
     @patch("multi_tenancy.views.capture_exception")
     def test_webhook_with_invalid_signature_fails(self, capture_exception):
