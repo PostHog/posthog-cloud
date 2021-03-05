@@ -1,2 +1,2 @@
-stripe==2.48.0
+stripe==2.56.0
 vcrpy==4.1.1 # tests only
