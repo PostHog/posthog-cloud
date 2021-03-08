@@ -63,7 +63,7 @@ Below is the documentation for the environment variables specifically scoped to 
 
 
 ## Additional docs
-Some features particular to this repo are documented bellow.
+Some features particular to this repo are documented below.
 - [Billing](docs/Billing.md)
 
 ## Questions?
