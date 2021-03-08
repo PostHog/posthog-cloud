@@ -1,7 +1,6 @@
 import datetime
 from typing import List, Optional, Tuple
 
-from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -29,21 +28,27 @@ class Plan(models.Model):
         max_length=32, unique=True, db_index=True,
     )
     name: models.CharField = models.CharField(max_length=128)
-    default_should_setup_billing: models.BooleanField = models.BooleanField(default=False,)
-    custom_setup_billing_message: models.TextField = models.TextField(blank=True)
-    price_id: models.CharField = models.CharField(max_length=128)
+    default_should_setup_billing: models.BooleanField = models.BooleanField(
+        default=False,
+    )  # determines whether `should_setup_billing` should be automatically set to `True` when this plan is assigned to an org
+    custom_setup_billing_message: models.TextField = models.TextField(
+        blank=True
+    )  # displays a custom message (in the UI) when prompting a user to confirm their billing details (e.g. explain the zero-auth charge in startup plan)
+    price_id: models.CharField = models.CharField(max_length=128)  # Stripe ID of the relevant price definition
     event_allowance: models.IntegerField = models.IntegerField(
         default=None, null=True, blank=True,
-    )  # number of monthly events that this plan allows; use null for unlimited events
+    )  # number of monthly events that this plan allows; use null for unlimited events and metered pricing
     is_active: models.BooleanField = models.BooleanField(default=True)
     is_metered_billing: models.BooleanField = models.BooleanField(
         default=False,
     )  # whether the plan is usaged-based (metered event-based billing) instead of flat-fee recurring billing;
-    # https://stripe.com/docs/billing/subscriptions/metered-billing
+    # https://stripe.com/docs/billing/subscriptions/metered-billing or docs/Billing.md
     self_serve: models.BooleanField = models.BooleanField(
         default=False,
-    )  # Whether users can subscribe to this plan by themselves **after sign up**
-    image_url: models.URLField = models.URLField(max_length=1024, blank=True)
+    )  # Whether users can subscribe to this plan by themselves after sign up (i.e. when `False` only PostHog Team can assign this plan)
+    image_url: models.URLField = models.URLField(
+        max_length=1024, blank=True
+    )  # URL of the image for the plan (display purposes)
     price_string: models.CharField = models.CharField(
         max_length=128, blank=True,
     )  # A human-friendly representation of the price of the plan to show on the front-end UI.
@@ -66,7 +71,7 @@ class OrganizationBilling(models.Model):
     stripe_customer_id: models.CharField = models.CharField(max_length=128, blank=True)
     stripe_checkout_session: models.CharField = models.CharField(
         max_length=128, blank=True,
-    )
+    )  # ID of the current checkout session. Only relevant during the setup phase. Use `stripe_subscription_id` afterwards.
     stripe_subscription_id: models.CharField = models.CharField(
         max_length=128, blank=True,
     )
@@ -76,10 +81,13 @@ class OrganizationBilling(models.Model):
     checkout_session_created_at: models.DateTimeField = models.DateTimeField(
         null=True, blank=True,
     )
-    should_setup_billing: models.BooleanField = models.BooleanField(default=False)
+    should_setup_billing: models.BooleanField = models.BooleanField(
+        default=False,
+    )  # When this is `True`, the customer will be shown a message prompting them to confirm their billing details on Stripe;
+    # should always be set if the customer hasn't added billing details. Must be set manually if the plan is manually assigned.
     billing_period_ends: models.DateTimeField = models.DateTimeField(
         null=True, blank=True,
-    )
+    )  # Entails the final date until when this plan will be active.
     plan: models.ForeignKey = models.ForeignKey(
         Plan, on_delete=models.PROTECT, null=True,
     )

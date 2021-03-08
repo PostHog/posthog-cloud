@@ -14,6 +14,7 @@ This document contains the technical details for the cloud billing engine.
 - The Environment Variables section of the README contains more details on how to set up some configuration details for the billing engine, however in terms of functionality, here is some additional points worth mentioning:
   - We support adding a free trial to all plans (through Stripe), which can be set up through an environment variable. Please note that we can only apply a free trial to all plans and all new customers. To apply trial periods to individual customers, please use the Stripe dashboard.
   - We have a default "no billing plan" state which is active until a customer signs up and starts in a particular plan. The only particularity of being in this state, is that we have a maximum monthly event allocation that can be used. This value is configurable via an env variable too.
+- While today almost all paid plans have all the same premium features, we do have support for dynamically changing the premium features that each plan can provide. Premium features are configured on the `Plan` model and rely on the `plan_key`. The actual logic for the premium feature lives within each feature in the main repo.
 
 
 ## Workflow
