@@ -38,9 +38,7 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int) -> None:
     except ValidationError:
         return
 
-    record, created = UserMessagingRecord.objects.get_or_create(
-        user=user, campaign=campaign,
-    )
+    record, created = UserMessagingRecord.objects.get_or_create(user=user, campaign=campaign,)
 
     with transaction.atomic():
         # Lock object (database-level) while the message is sent
@@ -60,6 +58,9 @@ def check_and_send_no_event_ingestion_follow_up(user_id: int) -> None:
 @shared_task
 def process_organization_signup_messaging(user_id: int, organization_id: str) -> None:
     """Process messaging for recently created organizations."""
+    # TODO: Tempoorarily disabled as we transition to the new messaging scheme from the core repo.
+    return
+
     # Send event ingestion follow-up in 24 hours, if no events have been ingested by that time
     check_and_send_no_event_ingestion_follow_up.apply_async(
         (user_id,), countdown=86_400,
