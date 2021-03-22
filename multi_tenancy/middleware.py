@@ -39,7 +39,7 @@ class PostHogTokenCookieMiddleware(SessionMiddleware):
 
             response.set_cookie(
                 key="ph_current_project_name",  # clarify which project is active (orgs can have multiple projects)
-                value=request.user.team.name,
+                value=request.user.team.name.encode('utf-8').decode('latin-1'),
                 max_age=365 * 24 * 60 * 60,
                 expires=default_cookie_options["expires"],
                 path=default_cookie_options["path"],
