@@ -98,10 +98,9 @@ class TestTeamSignup(TransactionBaseTest):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        response.data.pop('detail') # Message might be changed in main repo
+        response.data.pop("detail")  # Message might be changed in main repo
         self.assertEqual(
-            response.data["type"]
-            {"type": "validation_error", "code": "unique", "attr": "email",},
+            response.data["type"], {"type": "validation_error", "code": "unique", "attr": "email"},
         )
 
     @patch("posthoganalytics.capture")
