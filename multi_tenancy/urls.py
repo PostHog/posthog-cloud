@@ -1,9 +1,9 @@
 from typing import List
 
-from django.contrib.auth import decorators
 from django.urls import path, re_path
 from posthog.urls import home, opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
+from posthog.views import login_required
 
 from .views import (
     BillingSubscribeViewset,
@@ -55,5 +55,5 @@ urlpatterns += [
     ),  # Page with success message after setting up billing for hosted plans
     opt_slash_path("billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"),  # Stripe Webhook
     opt_slash_path("billing/subscribe", BillingSubscribeViewset.as_view({"post": "create"}), name="billing_subscribe"),
-    re_path(r"^.*", decorators.login_required(home)),  # Should always be at the very last position
+    re_path(r"^.*", login_required(home)),  # Should always be at the very last position
 ]
