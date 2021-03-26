@@ -120,22 +120,25 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
         # Startup plan
         plan.key = "startup"
         plan.save()
-        self.assertEqual(billing.available_features, ["zapier", "organizations_projects"])
+        self.assertIn("organizations_projects", billing.available_features)
+        self.assertIn("zapier", billing.available_features)
 
         # Growth plan
         plan.key = "growth"
         plan.save()
-        self.assertEqual(billing.available_features, ["zapier", "organizations_projects"])
+        self.assertIn("organizations_projects", billing.available_features)
 
         # Standard plan
         plan.key = "standard"
         plan.save()
-        self.assertEqual(billing.available_features, ["zapier", "organizations_projects"])
+        self.assertIn("organizations_projects", billing.available_features)
+        self.assertIn("zapier", billing.available_features)
 
         # Enterprise plan
         plan.key = "enterprise"
         plan.save()
-        self.assertEqual(billing.available_features, ["zapier", "organizations_projects"])
+        self.assertIn("organizations_projects", billing.available_features)
+        self.assertIn("zapier", billing.available_features)
 
     def test_feature_available_multi_tenancy(self):
         organization, _, _ = self.create_org_team_user()
