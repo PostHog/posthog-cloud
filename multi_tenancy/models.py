@@ -4,17 +4,17 @@ from typing import List, Optional, Tuple
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from ee.models import License
 from posthog.models import Organization, User
-from posthog.templatetags.posthog_filters import compact_number
 
 from .stripe import create_subscription, create_subscription_checkout_session, create_zero_auth
 
 PLANS = {
     "starter": ["organizations_projects"],
-    "growth": ["zapier", "organizations_projects"],
-    "startup": ["zapier", "organizations_projects"],
-    "standard": ["zapier", "organizations_projects"],
-    "enterprise": ["zapier", "organizations_projects"],
+    "growth": License.ENTERPRISE_FEATURES,
+    "startup": License.ENTERPRISE_FEATURES,
+    "standard": License.ENTERPRISE_FEATURES,
+    "enterprise": License.ENTERPRISE_FEATURES,
 }
 
 
