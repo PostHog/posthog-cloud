@@ -8,14 +8,13 @@ from django.utils import timezone
 from freezegun.api import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
 from multi_tenancy.stripe import compute_webhook_signature
-from posthog.api.test.base import TransactionBaseTest
 from posthog.models import User
 from rest_framework import status
 
-from .base import PlanTestMixin
+from .base import CloudAPIBaseTest
 
 
-class StripeWebhookTestMixin(TransactionBaseTest, PlanTestMixin):
+class StripeWebhookTestMixin(CloudAPIBaseTest):
     def generate_webhook_signature(self, payload: str, secret: str, timestamp: timezone.datetime = None,) -> str:
         timestamp = timezone.now() if not timestamp else timestamp
         computed_timestamp: int = int(timestamp.timestamp())

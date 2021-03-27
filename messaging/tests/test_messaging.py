@@ -2,11 +2,11 @@ from django.core import mail
 from django.db.utils import IntegrityError
 from messaging.models import UserMessagingRecord
 from messaging.tasks import check_and_send_no_event_ingestion_follow_up
-from posthog.api.test.base import BaseTest
+from multi_tenancy.tests.base import CloudBaseTest
 from posthog.models import Event, Team, User
 
 
-class TestMessaging(BaseTest):
+class TestMessaging(CloudBaseTest):
     def setUp(self):
         super().setUp()
         self.organization, self.team, self.user = User.objects.bootstrap(

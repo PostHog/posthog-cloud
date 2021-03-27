@@ -10,14 +10,12 @@ from django.utils import timezone
 from ee.clickhouse.models.event import create_event
 from freezegun import freeze_time
 from multi_tenancy.models import OrganizationBilling, Plan
-from posthog.api.test.base import APIBaseTest, BaseTest, TransactionBaseTest
+from multi_tenancy.tests.base import CloudAPIBaseTest, CloudBaseTest
 from posthog.models import User
 from rest_framework import status
 
-from .base import PlanTestMixin
 
-
-class TestPlan(BaseTest):
+class TestPlan(CloudBaseTest):
     def test_cannot_create_plan_without_required_attributes(self):
         with self.assertRaises(ValidationError) as e:
             Plan.objects.create()
@@ -36,7 +34,7 @@ class TestPlan(BaseTest):
         self.assertEqual(plan.event_allowance, None)
 
 
-class TestOrganizationBilling(BaseTest, PlanTestMixin):
+class TestOrganizationBilling(CloudBaseTest):
     def test_billing_is_active(self):
 
         plan = self.create_plan()
@@ -180,9 +178,7 @@ class TestOrganizationBilling(BaseTest, PlanTestMixin):
             self.assertEqual(billing.event_allocation, 7777)
 
 
-class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
-
-    TESTS_API = True
+class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
     # Setting up billing
 
@@ -716,15 +712,16 @@ class TestAPIOrganizationBilling(TransactionBaseTest, PlanTestMixin):
         self.assertEqual(org_billing.checkout_session_created_at, None)
 
 
-class PlanAPITestCase(APIBaseTest, PlanTestMixin):
-    def setUp(self):
-        super().setUp()
+class PlanAPITestCase(CloudAPIBaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        cls().setUpTestData()
 
         for _ in range(0, 3):
-            self.create_plan()
+            cls.create_plan()
 
-        self.create_plan(is_active=False)
-        self.create_plan(event_allowance=49334, self_serve=True)
+        cls.create_plan(is_active=False)
+        cls.create_plan(event_allowance=49334, self_serve=True)
 
     def test_listing_and_retrieving_plans(self):
         response = self.client.get("/api/plans")

@@ -1,14 +1,15 @@
 from unittest.mock import patch
 
 from multi_tenancy.models import OrganizationBilling, Plan
-from posthog.api.test.base import TransactionBaseTest
+from multi_tenancy.tests.base import CloudAPIBaseTest
 from posthog.models import Organization, Team, User
 from rest_framework import status
 
 
-class TestTeamSignup(TransactionBaseTest):
-    def setUp(self):
-        super().setUp()
+class TestTeamSignup(CloudAPIBaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
         User.objects.create(email="firstuser@posthog.com",)  # to ensure consistency in tests
 
     @patch("messaging.tasks.process_organization_signup_messaging.delay")

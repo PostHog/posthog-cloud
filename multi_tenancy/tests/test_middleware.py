@@ -1,11 +1,13 @@
 import json
 from urllib.parse import quote
 
-from posthog.api.test.base import APIBaseTest
+from multi_tenancy.tests.base import CloudAPIBaseTest
 from rest_framework import status
 
 
-class TestPostHogTokenCookieMiddleware(APIBaseTest):
+class TestPostHogTokenCookieMiddleware(CloudAPIBaseTest):
+    CONFIG_AUTO_LOGIN = False
+
     def test_logged_out_client(self):
         self.client.logout()
         response = self.client.get("/")
