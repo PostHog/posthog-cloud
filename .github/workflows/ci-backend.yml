@@ -34,7 +34,7 @@ jobs:
           python-version: "3.8"
 
       - name: Fetch posthog main repo
-        run: bin/pull_main
+        run: bin/pull_main backend-tests-refactor
 
       - name: Set up dependencies caching
         uses: actions/cache@v2
@@ -108,7 +108,7 @@ jobs:
 
       - name: Fetch posthog main repo
         run: |
-          bin/pull_main
+          bin/pull_main backend-tests-refactor
           cp deploy/ee/conftest.py deploy/messaging/conftest.py
           cp deploy/ee/conftest.py deploy/multi_tenancy/conftest.py
 
