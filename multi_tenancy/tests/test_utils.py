@@ -52,9 +52,9 @@ class TestUtils(CloudBaseTest):
 
     def test_get_event_usage_for_timerange(self):
 
-        org, team = self.create_org_and_team()
+        org, team, _ = self.create_org_team_user()
         team2 = Team.objects.create(organization=org)
-        another_org, another_team = self.create_org_and_team()
+        another_org, another_team, _ = self.create_org_team_user()
 
         # Set up some events
         with freeze_time("2020-03-02"):

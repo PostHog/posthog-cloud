@@ -23,8 +23,8 @@ class CloudMixin:
             organization_name="Z",
             first_name="X",
             email=f"user{random.randint(100, 999)}@posthog.com",
-            password=self.TESTS_PASSWORD,
-            team_fields={"api_token": "token789"},
+            password=self.CONFIG_PASSWORD,
+            team_fields={"api_token": f"token_{random.randint(100000, 999999)}"},
         )
 
     def create_plan(self, **kwargs):

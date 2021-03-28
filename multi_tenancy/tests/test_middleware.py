@@ -1,6 +1,7 @@
 import json
 from urllib.parse import quote
 
+from django.test.client import Client
 from multi_tenancy.tests.base import CloudAPIBaseTest
 from rest_framework import status
 
@@ -48,21 +49,21 @@ class TestPostHogTokenCookieMiddleware(CloudAPIBaseTest):
             "properties": {"distinct_id": 2, "token": self.team.api_token},
         }
 
-        response = self.client.get(
-            "/e/?data=%s" % quote(json.dumps(data)), content_type="application/json", HTTP_ORIGIN="https://localhost",
-        )
+        response = self.client.get("/e/?data=%s" % quote(json.dumps(data)), HTTP_ORIGIN="https://localhost",)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(0, len(response.cookies))  # no cookies are set
 
-        response = self.client.post(
+        django_client = Client()
+        response = django_client.post(
             "/track/",
-            data={
+            {
                 "data": json.dumps(
-                    [{"event": "beep", "properties": {"distinct_id": "eeee", "token": self.team.api_token}}],
+                    [{"event": "beep", "properties": {"distinct_id": "eeee", "token": self.team.api_token}}]
                 ),
                 "api_key": self.team.api_token,
             },
         )
+        print(response.json())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(0, len(response.cookies))  # no cookies are set
 

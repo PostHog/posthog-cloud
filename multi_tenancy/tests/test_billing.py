@@ -713,15 +713,14 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
 
 class PlanAPITestCase(CloudAPIBaseTest):
-    @classmethod
-    def setUpTestData(cls):
-        cls().setUpTestData()
+    def setUp(self):
+        super().setUp()
 
         for _ in range(0, 3):
-            cls.create_plan()
+            self.create_plan()
 
-        cls.create_plan(is_active=False)
-        cls.create_plan(event_allowance=49334, self_serve=True)
+        self.create_plan(is_active=False)
+        self.create_plan(event_allowance=49334, self_serve=True)
 
     def test_listing_and_retrieving_plans(self):
         response = self.client.get("/api/plans")

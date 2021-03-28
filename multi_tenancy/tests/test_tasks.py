@@ -14,11 +14,11 @@ class TestTasks(CloudBaseTest):
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
     def test_compute_daily_usage_for_organizations(self, mock_create_usage_record, _):
         plan = Plan.objects.create(key="metered", name="Metered", price_id="m1", is_metered_billing=True)
-        org, team = self.create_org_and_team()
+        org, team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
         )
-        another_org, another_team = self.create_org_and_team()
+        another_org, another_team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=another_org, stripe_subscription_item_id="si_01234567890", plan=plan,
         )
@@ -63,15 +63,15 @@ class TestTasks(CloudBaseTest):
     @patch("multi_tenancy.tasks._compute_daily_usage_for_organization")
     def test_only_rerport_relevant_usage_for_organizations(self, mock_individual_org_task):
         plan = Plan.objects.create(key="unmetered", price_id="u1", name="Flat fee")
-        org, team = self.create_org_and_team()
+        org, _, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
         )  # non-metered plan
-        another_org, another_team = self.create_org_and_team()
+        another_org, _, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=another_org, plan=plan,
         )  # no subscription item ID plan
-        _, unbilled_team = self.create_org_and_team()  # no OrganizationBilling
+        _, _, _ = self.create_org_team_user()  # no OrganizationBilling
 
         compute_daily_usage_for_organizations()
         mock_individual_org_task.assert_not_called()
@@ -81,7 +81,7 @@ class TestTasks(CloudBaseTest):
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
     def test_compute_daily_usage_for_different_date(self, mock_create_usage_record, _):
         plan = Plan.objects.create(key="metered", name="Metered", price_id="m1", is_metered_billing=True)
-        org, team = self.create_org_and_team()
+        org, team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
         )
