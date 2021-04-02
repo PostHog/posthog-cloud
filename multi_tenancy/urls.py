@@ -1,9 +1,8 @@
 from typing import List
 
-from django.urls import path, re_path
+from django.urls import path
 from posthog.urls import home, opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
-from posthog.views import login_required
 
 from .views import (
     BillingSubscribeViewset,
@@ -16,28 +15,16 @@ from .views import (
     stripe_billing_portal,
     stripe_checkout_view,
     stripe_webhook,
-    user_with_billing,
 )
 
-# Include `posthog-production` override routes first
+# Include `posthog-cloud` routes first
 urlpatterns: List = [
-    opt_slash_path(
-        "api/user", user_with_billing,
-    ),  # Override to include billing information (included at the top to overwrite main repo `posthog` route)
     opt_slash_path(
         "api/signup", MultiTenancyOrgSignupViewset.as_view(),
     ),  # Override to support setting a billing plan on signup
     opt_slash_path("api/plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
     path("api/plans/<str:key>/template/", plan_template, name="billing_plan_template"),
     path("api/plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
-]
-
-# Include `posthog` default routes, except the home route (to give precendence to billing routes)
-urlpatterns += posthog_urls[:-1]
-
-
-# Include `posthog-production` routes and the home route as fallback
-urlpatterns += [
     opt_slash_path(
         "billing/setup", stripe_checkout_view, name="billing_setup",
     ),  # Redirect to Stripe Checkout to set-up billing (requires session ID)
@@ -55,5 +42,7 @@ urlpatterns += [
     ),  # Page with success message after setting up billing for hosted plans
     opt_slash_path("billing/stripe_webhook", stripe_webhook, name="billing_stripe_webhook"),  # Stripe Webhook
     opt_slash_path("billing/subscribe", BillingSubscribeViewset.as_view({"post": "create"}), name="billing_subscribe"),
-    re_path(r"^.*", login_required(home)),  # Should always be at the very last position
 ]
+
+# Include base `posthog` routes
+urlpatterns += posthog_urls

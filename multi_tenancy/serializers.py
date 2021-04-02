@@ -10,6 +10,7 @@ from rest_framework import serializers
 from sentry_sdk import capture_exception
 
 from .models import OrganizationBilling, Plan
+from .utils import get_cached_monthly_event_usage
 
 
 class ReadOnlySerializer(serializers.ModelSerializer):
@@ -63,6 +64,14 @@ class PlanSerializer(ReadOnlySerializer):
         ]
 
 
+class BillingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrganizationBilling
+        fields = [
+            "plan",
+        ]
+
+
 class BillingSubscribeSerializer(serializers.Serializer):
     """
     Serializer allowing a user to set up billing information.
@@ -111,4 +120,3 @@ class BillingSubscribeSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         return instance
-

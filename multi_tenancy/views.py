@@ -5,15 +5,12 @@ from typing import Dict, Optional
 
 import posthoganalytics
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import get_template
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from posthog.api.organization import OrganizationSignupViewset
-from posthog.api.user import user
 from posthog.urls import render_template
 from rest_framework import mixins, status
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -23,9 +20,8 @@ import stripe
 from multi_tenancy.tasks import report_card_validated, update_subscription_billing_period
 
 from .models import OrganizationBilling, Plan
-from .serializers import BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
+from .serializers import BillingSerializer, BillingSubscribeSerializer, MultiTenancyOrgSignupSerializer, PlanSerializer
 from .stripe import cancel_payment_intent, customer_portal_url, parse_webhook, set_default_payment_method_for_customer
-from .utils import get_cached_monthly_event_usage
 
 logger = logging.getLogger(__name__)
 
@@ -48,79 +44,12 @@ class PlanViewset(ModelViewSet):
         return queryset
 
 
+class BillingViewset(GenericViewSet):
+    serializer_class = BillingSerializer
+
+
 class BillingSubscribeViewset(mixins.CreateModelMixin, GenericViewSet):
     serializer_class = BillingSubscribeSerializer
-
-
-def user_with_billing(request: HttpRequest):
-    """
-    Overrides the posthog.api.user.user response to include
-    appropriate billing information in the request
-    """
-
-    response = user(request)
-
-    if response.status_code == 200 and request.user.organization:
-        instance, _ = OrganizationBilling.objects.get_or_create(organization=request.user.organization,)
-
-        output = json.loads(response.content)
-
-        output["billing"] = {
-            "plan": None,
-            "event_allocation": instance.event_allocation,
-        }
-
-        # Obtain event usage of current organization
-        event_usage: Optional[int] = None
-        try:
-            # Function calls clickhouse so make sure Clickhouse failure doesn't block api/user from loading
-            event_usage = get_cached_monthly_event_usage(request.user.organization)
-        except Exception as e:
-            capture_exception(e)
-
-        output["billing"]["current_usage"] = event_usage
-
-        if instance.plan:
-            plan_serializer = PlanSerializer()
-            output["billing"]["plan"] = plan_serializer.to_representation(instance=instance.plan,)
-
-            if instance.should_setup_billing and not instance.is_billing_active:
-
-                if (
-                    instance.stripe_checkout_session
-                    and instance.checkout_session_created_at
-                    and instance.checkout_session_created_at + timezone.timedelta(minutes=1439) > timezone.now()
-                ):
-                    # Checkout session has been created and is still active (i.e. created less than 24 hours ago)
-                    checkout_session = instance.stripe_checkout_session
-                else:
-
-                    try:
-                        (checkout_session, customer_id,) = instance.create_checkout_session(
-                            user=request.user, base_url=request.build_absolute_uri("/"),
-                        )
-                    except ImproperlyConfigured as e:
-                        capture_exception(e)
-                        checkout_session = None
-                    else:
-                        if checkout_session:
-                            OrganizationBilling.objects.filter(pk=instance.pk).update(
-                                stripe_checkout_session=checkout_session,
-                                stripe_customer_id=customer_id,
-                                checkout_session_created_at=timezone.now(),
-                            )
-
-                if checkout_session:
-                    output["billing"] = {
-                        **output["billing"],
-                        "should_setup_billing": True,
-                        "stripe_checkout_session": checkout_session,
-                        "subscription_url": f"/billing/setup?session_id={checkout_session}",
-                    }
-
-        response = JsonResponse(output)
-
-    return response
 
 
 def stripe_checkout_view(request: HttpRequest):
