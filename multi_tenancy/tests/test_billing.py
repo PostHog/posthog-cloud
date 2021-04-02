@@ -185,12 +185,21 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
     def test_team_should_not_set_up_billing_by_default(self):
 
         count: int = OrganizationBilling.objects.count()
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"], {"plan": None, "current_usage": 0, "event_allocation": None},
+            response_data,
+            {
+                "should_setup_billing": False,
+                "is_billing_active": False,
+                "plan": None,
+                "billing_period_ends": None,
+                "event_allocation": None,
+                "current_usage": 0,
+                "subscription_url": None,
+            },
         )
 
         # OrganizationBilling object should've been created if non-existent
@@ -205,16 +214,25 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
     def test_provide_event_allocation_for_when_no_billing_plan_is_setup(self):
 
         with self.settings(BILLING_NO_PLAN_EVENT_ALLOCATION=7500):
-            response = self.client.post("/api/user/")
+            response = self.client.get("/api/billing/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"], {"plan": None, "current_usage": 0, "event_allocation": 7500},
+            response_data,
+            {
+                "should_setup_billing": False,
+                "is_billing_active": False,
+                "plan": None,
+                "billing_period_ends": None,
+                "event_allocation": 7500,
+                "current_usage": 0,
+                "subscription_url": None,
+            },
         )
 
-    def test_team_that_should_not_set_up_billing(self):
+    def test_team_with_some_event_usage(self):
         organization, team, user = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=False,
@@ -227,12 +245,21 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 team=team, event="$pageview", distinct_id="distinct_id", event_uuid=uuid.uuid4(),
             )
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"], {"plan": None, "current_usage": 3, "event_allocation": None},
+            response_data,
+            {
+                "should_setup_billing": False,
+                "is_billing_active": False,
+                "plan": None,
+                "billing_period_ends": None,
+                "event_allocation": None,
+                "current_usage": 3,
+                "subscription_url": None,
+            },
         )
 
     @patch("multi_tenancy.stripe._get_customer_id")
@@ -240,7 +267,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         self, mock_customer_id,
     ):
         mock_customer_id.return_value = "cus_000111222"
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(custom_setup_billing_message="Sign up now!", event_allowance=50000,)
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
@@ -249,7 +276,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
         with self.assertLogs("multi_tenancy.stripe") as log:
 
-            response = self.client.post("/api/user/")
+            response = self.client.get("/api/billing/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
             self.assertIn(
@@ -261,16 +288,13 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
             )  # Correct price ID is used
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(response_data["should_setup_billing"], True)
         self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
-        )
-        self.assertEqual(
-            response_data["billing"]["subscription_url"], "/billing/setup?session_id=cs_1234567890",
+            response_data["subscription_url"], "/billing/setup?session_id=cs_1234567890",
         )
 
         self.assertEqual(
-            response_data["billing"]["plan"],
+            response_data["plan"],
             {
                 "key": plan.key,
                 "name": plan.name,
@@ -285,9 +309,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
         # Check that the checkout session was saved to the database
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session, response_data["billing"]["stripe_checkout_session"],
-        )
+        self.assertEqual(instance.stripe_checkout_session, "cs_1234567890")
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
     @patch("multi_tenancy.stripe._get_customer_id")
@@ -305,14 +327,14 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         mock_cs_session.id = "cs_1234567890"
 
         mock_checkout.return_value = mock_cs_session
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(key="startup")
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Assert that Stripe was called with the correct data
@@ -331,16 +353,13 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         )
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(response_data["should_setup_billing"], True)
         self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",
-        )
-        self.assertEqual(
-            response_data["billing"]["subscription_url"], "/billing/setup?session_id=cs_1234567890",
+            response_data["subscription_url"], "/billing/setup?session_id=cs_1234567890",
         )
 
         self.assertEqual(
-            response_data["billing"]["plan"],
+            response_data["plan"],
             {
                 "key": "startup",
                 "name": plan.name,
@@ -355,9 +374,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
         # Check that the checkout session was saved to the database
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session, "cs_1234567890",
-        )
+        self.assertEqual(instance.stripe_checkout_session, "cs_1234567890")
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
     @patch("multi_tenancy.stripe._get_customer_id")
@@ -375,14 +392,14 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         mock_cs_session.id = "cs_usage_1234567890"
 
         mock_checkout.return_value = mock_cs_session
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(key="usage1", is_metered_billing=True)
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=plan,
         )
         self.client.force_login(user)
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Assert that Stripe was called with the correct data
@@ -401,16 +418,13 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         )
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(response_data["should_setup_billing"], True)
         self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_usage_1234567890",
-        )
-        self.assertEqual(
-            response_data["billing"]["subscription_url"], "/billing/setup?session_id=cs_usage_1234567890",
+            response_data["subscription_url"], "/billing/setup?session_id=cs_usage_1234567890",
         )
 
         self.assertEqual(
-            response_data["billing"]["plan"],
+            response_data["plan"],
             {
                 "key": "usage1",
                 "name": plan.name,
@@ -425,16 +439,14 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
         # Check that the checkout session was saved to the database
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session, "cs_usage_1234567890",
-        )
+        self.assertEqual(instance.stripe_checkout_session, "cs_usage_1234567890")
         self.assertEqual(instance.stripe_customer_id, "cus_000111222")
 
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_already_active_checkout_session_uses_same_session(
         self, mock_customer_id,
     ):
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan()
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization,
@@ -445,31 +457,26 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         )
         self.client.force_login(user)
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
-        self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_987654321",  # <- same session
-        )
+        self.assertEqual(response_data["should_setup_billing"], True)
         mock_customer_id.assert_not_called()  # Stripe is not called
         self.assertEqual(
-            response_data["billing"]["subscription_url"], "/billing/setup?session_id=cs_987654321",
+            response_data["subscription_url"], "/billing/setup?session_id=cs_987654321",
         )
 
         # Check that the checkout session does not change
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session, response_data["billing"]["stripe_checkout_session"],
-        )
+        self.assertEqual(instance.stripe_checkout_session, "cs_987654321")
 
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_expired_checkout_session_generates_a_new_one(
         self, mock_customer_id,
     ):
         mock_customer_id.return_value = "cus_000111222"
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan()
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization,
@@ -480,21 +487,20 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         )
         self.client.force_login(user)
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data: Dict = response.json()
-        self.assertEqual(response_data["billing"]["should_setup_billing"], True)
+        self.assertEqual(response_data["should_setup_billing"], True)
         self.assertEqual(
-            response_data["billing"]["stripe_checkout_session"], "cs_1234567890",  # <- note the different session
+            response_data["subscription_url"],
+            "/billing/setup?session_id=cs_1234567890",  # <- note the different session
         )
         mock_customer_id.assert_called_once()
 
         # Assert that the new checkout session was saved to the database
         instance.refresh_from_db()
-        self.assertEqual(
-            instance.stripe_checkout_session, response_data["billing"]["stripe_checkout_session"],
-        )
+        self.assertEqual(instance.stripe_checkout_session, "cs_1234567890")
 
     def test_cannot_start_double_billing_subscription(self):
         organization, _, user = self.create_org_team_user()
@@ -512,10 +518,10 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         # Make sure the billing is already active
         self.assertEqual(instance.is_billing_active, True)
 
-        response_data = self.client.post("/api/user/").json()
+        response_data = self.client.get("/api/billing/").json()
 
         self.assertEqual(
-            response_data["billing"]["plan"],
+            response_data["plan"],
             {
                 "key": plan.key,
                 "name": plan.name,
@@ -533,31 +539,31 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         If Stripe variables are not properly set, an exception will be sent to Sentry.
         """
 
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         instance: OrganizationBilling = OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True, plan=self.create_plan(),
         )
         self.client.force_login(user)
 
         with self.settings(STRIPE_API_KEY=""):
-            response_data: Dict = self.client.post("/api/user/").json()
+            response_data: Dict = self.client.get("/api/billing/").json()
 
-        self.assertNotIn(
-            "should_setup_billing", response_data["billing"],
-        )
+        self.assertEqual(response_data["should_setup_billing"], True)
+        self.assertEqual(response_data["subscription_url"], None)
+        self.assertEqual(response_data["plan"]["is_metered_billing"], False)  # Make sure the full plan object is sent
 
         instance.refresh_from_db()
         self.assertEqual(instance.stripe_checkout_session, "")
 
-    @patch("multi_tenancy.utils.get_cached_monthly_event_usage")
+    @patch("multi_tenancy.utils.get_monthly_event_usage")
     def test_event_usage_is_cached(self, mock_method):
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         self.client.force_login(user)
 
         # Org has no events, but cached result is used
         cache.set(f"monthly_usage_{organization.id}", 4831, 10)
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Assert that the uncached method was not called
@@ -565,7 +571,16 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
         response_data: Dict = response.json()
         self.assertEqual(
-            response_data["billing"], {"plan": None, "event_allocation": None, "current_usage": 4831},
+            response_data,
+            {
+                "should_setup_billing": False,
+                "is_billing_active": False,
+                "plan": None,
+                "billing_period_ends": None,
+                "event_allocation": None,
+                "current_usage": 4831,
+                "subscription_url": None,
+            },
         )
 
     @freeze_time("2018-12-31T22:59:59.000000Z")
@@ -579,9 +594,9 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 team=team, event="$pageview", distinct_id="distinct_id", event_uuid=uuid.uuid4(),
             )
 
-        response = self.client.post("/api/user/")
+        response = self.client.get("/api/billing/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["billing"]["current_usage"], 3)
+        self.assertEqual(response.json()["current_usage"], 3)
 
         # Check that result was cached
         cache_key = f"monthly_usage_{organization.id}"

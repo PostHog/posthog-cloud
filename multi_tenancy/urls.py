@@ -1,11 +1,12 @@
 from typing import List
 
 from django.urls import path
-from posthog.urls import home, opt_slash_path
+from posthog.urls import opt_slash_path
 from posthog.urls import urlpatterns as posthog_urls
 
 from .views import (
     BillingSubscribeViewset,
+    BillingViewset,
     MultiTenancyOrgSignupViewset,
     PlanViewset,
     billing_failed_view,
@@ -25,6 +26,7 @@ urlpatterns: List = [
     opt_slash_path("api/plans", PlanViewset.as_view({"get": "list"}), name="billing_plans"),
     path("api/plans/<str:key>/template/", plan_template, name="billing_plan_template"),
     path("api/plans/<str:key>", PlanViewset.as_view({"get": "retrieve"}), name="billing_plan"),
+    opt_slash_path("api/billing", BillingViewset.as_view({"get": "retrieve"}), name="billing"),
     opt_slash_path(
         "billing/setup", stripe_checkout_view, name="billing_setup",
     ),  # Redirect to Stripe Checkout to set-up billing (requires session ID)

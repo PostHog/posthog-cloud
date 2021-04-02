@@ -5,7 +5,6 @@ from django.utils import timezone
 from messaging.tasks import process_organization_signup_messaging
 from posthog.api.organization import OrganizationSignupSerializer
 from posthog.models import User
-from posthog.templatetags.posthog_filters import compact_number
 from rest_framework import serializers
 from sentry_sdk import capture_exception
 
@@ -65,11 +64,56 @@ class PlanSerializer(ReadOnlySerializer):
 
 
 class BillingSerializer(serializers.ModelSerializer):
+    plan = PlanSerializer(read_only=True)
+    current_usage = serializers.SerializerMethodField()
+    subscription_url = serializers.SerializerMethodField()
+
     class Meta:
         model = OrganizationBilling
         fields = [
+            "should_setup_billing",
+            "is_billing_active",
             "plan",
+            "billing_period_ends",
+            "event_allocation",
+            "current_usage",
+            "subscription_url",
         ]
+
+    def get_current_usage(self, instance: OrganizationBilling) -> Optional[int]:
+        try:
+            return get_cached_monthly_event_usage(instance.organization)
+        except Exception as e:
+            capture_exception(e)
+        return None
+
+    def get_subscription_url(self, instance: OrganizationBilling) -> Optional[str]:
+        request = self.context["request"]
+        checkout_session = None
+        if instance.should_setup_billing and not instance.is_billing_active:
+            if (
+                instance.stripe_checkout_session
+                and instance.checkout_session_created_at
+                and instance.checkout_session_created_at + timezone.timedelta(minutes=1439) > timezone.now()
+            ):
+                # Checkout session has been created and is still active (i.e. created less than 24 hours ago)
+                checkout_session = instance.stripe_checkout_session
+            else:
+                try:
+                    (checkout_session, customer_id) = instance.create_checkout_session(
+                        user=request.user, base_url=request.build_absolute_uri("/"),
+                    )
+                except ImproperlyConfigured as e:
+                    capture_exception(e)
+                else:
+                    if checkout_session:
+                        OrganizationBilling.objects.filter(pk=instance.pk).update(
+                            stripe_checkout_session=checkout_session,
+                            stripe_customer_id=customer_id,
+                            checkout_session_created_at=timezone.now(),
+                        )
+
+        return f"/billing/setup?session_id={checkout_session}" if checkout_session else None
 
 
 class BillingSubscribeSerializer(serializers.Serializer):

@@ -44,8 +44,12 @@ class PlanViewset(ModelViewSet):
         return queryset
 
 
-class BillingViewset(GenericViewSet):
+class BillingViewset(mixins.RetrieveModelMixin, GenericViewSet):
     serializer_class = BillingSerializer
+
+    def get_object(self) -> OrganizationBilling:
+        instance, _ = OrganizationBilling.objects.get_or_create(organization=self.request.user.organization)
+        return instance
 
 
 class BillingSubscribeViewset(mixins.CreateModelMixin, GenericViewSet):
