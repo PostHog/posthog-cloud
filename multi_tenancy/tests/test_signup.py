@@ -41,6 +41,7 @@ class TestTeamSignup(CloudAPIBaseTest):
             response.data,
             {
                 "id": user.pk,
+                "uuid": str(user.uuid),
                 "distinct_id": user.distinct_id,
                 "first_name": "John",
                 "email": "hedgehog@posthog.com",
@@ -249,6 +250,7 @@ class TestTeamSignup(CloudAPIBaseTest):
             response.data,
             {
                 "id": user.pk,
+                "uuid": str(user.uuid),
                 "distinct_id": user.distinct_id,
                 "first_name": "John",
                 "email": "multi@posthog.com",
