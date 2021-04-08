@@ -37,6 +37,7 @@ class TestTeamSignup(CloudAPIBaseTest):
         user: User = User.objects.order_by("-pk")[0]
         team: Team = user.teams.first()
         organization: Organization = user.organizations.first()
+        response.data.pop("uuid")
         self.assertEqual(
             response.data,
             {
@@ -246,6 +247,7 @@ class TestTeamSignup(CloudAPIBaseTest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         user: User = User.objects.order_by("-pk")[0]
+        response.data.pop("uuid")
         self.assertEqual(
             response.data,
             {
@@ -287,4 +289,3 @@ class TestTeamSignup(CloudAPIBaseTest):
         mock_messaging.assert_called_once_with(
             user_id=user.pk, organization_id=str(user.organization.id),
         )
-
