@@ -1,5 +1,6 @@
 import datetime
 import logging
+from decimal import Decimal
 from typing import Any, Dict, Optional, Tuple, Union
 
 from django.conf import settings
@@ -64,13 +65,13 @@ def create_subscription_checkout_session(
     return (session.id, customer_id)
 
 
-def create_zero_auth(email: str, base_url: str, customer_id: str = "",) -> Tuple[str, str]:
+def create_zero_auth(email: str, base_url: str, customer_id: str = "") -> Tuple[str, str]:
 
     customer_id = _get_customer_id(customer_id, email)
 
     payload: Dict = {
         "payment_method_types": ["card"],
-        "line_items": [{"amount": 50, "quantity": 1, "currency": "USD", "name": "Card authorization",},],
+        "line_items": [{"amount": 50, "quantity": 1, "currency": "USD", "name": "Card authorization"}],
         "mode": "payment",
         "payment_intent_data": {
             "capture_method": "manual",
@@ -153,3 +154,14 @@ def report_subscription_item_usage(subscription_item_id: str, billed_usage: int,
 def get_subscription(subscription_id: str) -> Dict[str, Any]:
     _init_stripe()
     return stripe.Subscription.retrieve(subscription_id)
+
+
+def get_current_usage_bill(subscription_id: str) -> Optional[Decimal]:
+    """
+    Obtains the upcoming invoice (not billed yet) for the relevant subscription and parses the
+    zero-decimal amount.
+    """
+    _init_stripe()
+
+    invoice = stripe.Invoice.upcoming(subscription=subscription_id)
+    return Decimal(invoice["amount_due"] / 100) if invoice.get("amount_due") else None
