@@ -588,6 +588,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "current_usage": 4831,
                 "subscription_url": None,
                 "current_bill_amount": None,
+                "should_display_current_bill": False,
             },
         )
 
@@ -763,7 +764,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "is_billing_active": True,
                 "billing_period_ends": billing_period_ends.isoformat().replace("+00:00", "Z"),
                 "event_allocation": None,
-                "current_usage": None,  # TODO
+                "current_usage": 0,
                 "subscription_url": None,
                 "current_bill_amount": 78.23,
                 "should_display_current_bill": True,
