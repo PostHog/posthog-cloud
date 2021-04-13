@@ -1,0 +1,107 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.56.0
+    method: GET
+    uri: https://api.stripe.com/v1/invoices/upcoming?subscription=sub_J2i9v9VdhWbjju
+  response:
+    body:
+      string: "{\n  \"object\": \"invoice\",\n  \"account_country\": \"US\",\n  \"account_name\":
+        \"PostHog\",\n  \"account_tax_ids\": null,\n  \"amount_due\": 7823,\n  \"amount_paid\":
+        0,\n  \"amount_remaining\": 0,\n  \"application_fee_amount\": null,\n  \"attempt_count\":
+        0,\n  \"attempted\": false,\n  \"billing_reason\": \"upcoming\",\n  \"charge\":
+        null,\n  \"collection_method\": \"charge_automatically\",\n  \"created\":
+        1619979245,\n  \"currency\": \"usd\",\n  \"custom_fields\": null,\n  \"customer\":
+        \"cus_IuiXChYGDqmHPi\",\n  \"customer_address\": null,\n  \"customer_email\":
+        \"test@posthog.com\",\n  \"customer_name\": null,\n  \"customer_phone\": null,\n
+        \ \"customer_shipping\": null,\n  \"customer_tax_exempt\": \"none\",\n  \"customer_tax_ids\":
+        [\n\n  ],\n  \"default_payment_method\": null,\n  \"default_source\": null,\n
+        \ \"default_tax_rates\": [\n\n  ],\n  \"description\": null,\n  \"discount\":
+        null,\n  \"discounts\": [\n\n  ],\n  \"due_date\": null,\n  \"ending_balance\":
+        0,\n  \"footer\": null,\n  \"last_finalization_error\": null,\n  \"lines\":
+        {\n    \"object\": \"list\",\n    \"data\": [\n      {\n        \"id\": \"il_tmp_17b309EuIatRXSdz71af6143\",\n
+        \       \"object\": \"line_item\",\n        \"amount\": 0,\n        \"currency\":
+        \"usd\",\n        \"description\": \"0 \xD7 Test Product (Tier 1 at $0.0005
+        / month)\",\n        \"discount_amounts\": [\n\n        ],\n        \"discountable\":
+        true,\n        \"discounts\": [\n\n        ],\n        \"livemode\": false,\n
+        \       \"metadata\": {\n        },\n        \"period\": {\n          \"end\":
+        1619978945,\n          \"start\": 1617387005\n        },\n        \"plan\":
+        {\n          \"id\": \"price_1IIt6eEuIatRXSdz0WhjQeI2\",\n          \"object\":
+        \"plan\",\n          \"active\": true,\n          \"aggregate_usage\": \"sum\",\n
+        \         \"amount\": null,\n          \"amount_decimal\": null,\n          \"billing_scheme\":
+        \"tiered\",\n          \"created\": 1612865164,\n          \"currency\": \"usd\",\n
+        \         \"interval\": \"month\",\n          \"interval_count\": 1,\n          \"livemode\":
+        false,\n          \"metadata\": {\n          },\n          \"nickname\": null,\n
+        \         \"product\": \"prod_IuiXiNy8CGzEj7\",\n          \"tiers\": [\n
+        \           {\n              \"flat_amount\": null,\n              \"flat_amount_decimal\":
+        null,\n              \"unit_amount\": null,\n              \"unit_amount_decimal\":
+        \"0.05\",\n              \"up_to\": 1000\n            },\n            {\n
+        \             \"flat_amount\": null,\n              \"flat_amount_decimal\":
+        null,\n              \"unit_amount\": 1,\n              \"unit_amount_decimal\":
+        \"1\",\n              \"up_to\": null\n            }\n          ],\n          \"tiers_mode\":
+        \"graduated\",\n          \"transform_usage\": null,\n          \"trial_period_days\":
+        null,\n          \"usage_type\": \"metered\"\n        },\n        \"price\":
+        {\n          \"id\": \"price_1IIt6eEuIatRXSdz0WhjQeI2\",\n          \"object\":
+        \"price\",\n          \"active\": true,\n          \"billing_scheme\": \"tiered\",\n
+        \         \"created\": 1612865164,\n          \"currency\": \"usd\",\n          \"livemode\":
+        false,\n          \"lookup_key\": null,\n          \"metadata\": {\n          },\n
+        \         \"nickname\": null,\n          \"product\": \"prod_IuiXiNy8CGzEj7\",\n
+        \         \"recurring\": {\n            \"aggregate_usage\": \"sum\",\n            \"interval\":
+        \"month\",\n            \"interval_count\": 1,\n            \"trial_period_days\":
+        null,\n            \"usage_type\": \"metered\"\n          },\n          \"tiers_mode\":
+        \"graduated\",\n          \"transform_quantity\": null,\n          \"type\":
+        \"recurring\",\n          \"unit_amount\": null,\n          \"unit_amount_decimal\":
+        null\n        },\n        \"proration\": false,\n        \"quantity\": 0,\n
+        \       \"subscription\": \"sub_J2i9v9VdhWbjju\",\n        \"subscription_item\":
+        \"si_J2i9eUttdXoSlA\",\n        \"tax_amounts\": [\n\n        ],\n        \"tax_rates\":
+        [\n\n        ],\n        \"type\": \"subscription\"\n      }\n    ],\n    \"has_more\":
+        false,\n    \"total_count\": 1,\n    \"url\": \"/v1/invoices/upcoming/lines?subscription=sub_J2i9v9VdhWbjju\"\n
+        \ },\n  \"livemode\": false,\n  \"metadata\": {\n  },\n  \"next_payment_attempt\":
+        1619982845,\n  \"number\": null,\n  \"on_behalf_of\": null,\n  \"paid\": false,\n
+        \ \"payment_intent\": null,\n  \"payment_settings\": {\n    \"payment_method_options\":
+        null,\n    \"payment_method_types\": null\n  },\n  \"period_end\": 1619979245,\n
+        \ \"period_start\": 1617387245,\n  \"post_payment_credit_notes_amount\": 0,\n
+        \ \"pre_payment_credit_notes_amount\": 0,\n  \"receipt_number\": null,\n  \"starting_balance\":
+        0,\n  \"statement_descriptor\": null,\n  \"status\": \"draft\",\n  \"status_transitions\":
+        {\n    \"finalized_at\": null,\n    \"marked_uncollectible_at\": null,\n    \"paid_at\":
+        null,\n    \"voided_at\": null\n  },\n  \"subscription\": \"sub_J2i9v9VdhWbjju\",\n
+        \ \"subtotal\": 0,\n  \"tax\": null,\n  \"tax_percent\": null,\n  \"total\":
+        0,\n  \"total_discount_amounts\": [\n\n  ],\n  \"total_tax_amounts\": [\n\n
+        \ ],\n  \"transfer_data\": null,\n  \"webhooks_delivered_at\": null\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      stripe-version:
+      - '2020-03-02'
+      x-stripe-c-cost:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
