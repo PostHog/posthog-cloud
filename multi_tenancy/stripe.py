@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
+from sentry_sdk.api import capture_exception
 
 import stripe
 from multi_tenancy.utils import get_billing_cycle_anchor
@@ -163,5 +164,9 @@ def get_current_usage_bill(subscription_id: str) -> Optional[Decimal]:
     """
     _init_stripe()
 
-    invoice = stripe.Invoice.upcoming(subscription=subscription_id)
-    return Decimal(invoice["amount_due"] / 100) if invoice.get("amount_due") else None
+    try:
+        invoice = stripe.Invoice.upcoming(subscription=subscription_id)
+        return Decimal(invoice["amount_due"] / 100) if invoice.get("amount_due") else None
+    except Exception as e:
+        capture_exception(e)
+        return None

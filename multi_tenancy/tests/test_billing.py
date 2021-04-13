@@ -199,6 +199,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "event_allocation": None,
                 "current_usage": 0,
                 "subscription_url": None,
+                "current_bill_amount": None,
             },
         )
 
@@ -229,6 +230,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "event_allocation": 7500,
                 "current_usage": 0,
                 "subscription_url": None,
+                "current_bill_amount": None,
             },
         )
 
@@ -259,6 +261,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "event_allocation": None,
                 "current_usage": 3,
                 "subscription_url": None,
+                "current_bill_amount": None,
             },
         )
 
@@ -580,6 +583,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "event_allocation": None,
                 "current_usage": 4831,
                 "subscription_url": None,
+                "current_bill_amount": None,
             },
         )
 
@@ -644,7 +648,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
 
     def test_user_with_no_billing_set_up_cannot_manage_it(self):
 
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         OrganizationBilling.objects.create(
             organization=organization, should_setup_billing=True,
         )
@@ -657,7 +661,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
     @patch("multi_tenancy.stripe._get_customer_id")
     def test_organization_can_enroll_in_self_serve_plan(self, mock_customer_id):
         mock_customer_id.return_value = "cus_000111222"
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(self_serve=True)
 
         org_billing = OrganizationBilling.objects.create(
@@ -687,7 +691,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         self, mock_customer_id,
     ):
         mock_customer_id.return_value = "cus_000111222"
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(self_serve=True)
 
         self.client.force_login(user)
@@ -710,7 +714,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         self.assertTrue((timezone.now() - org_billing.checkout_session_created_at).total_seconds() <= 2,)
 
     def test_cannot_enroll_in_non_self_serve_plan(self):
-        organization, team, user = self.create_org_team_user()
+        organization, _, user = self.create_org_team_user()
         plan = self.create_plan(self_serve=False)
 
         org_billing = OrganizationBilling.objects.create(organization=organization)
