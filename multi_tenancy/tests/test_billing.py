@@ -201,6 +201,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "current_usage": 0,
                 "subscription_url": None,
                 "current_bill_amount": None,
+                "should_display_current_bill": False,
             },
         )
 
@@ -232,6 +233,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "current_usage": 0,
                 "subscription_url": None,
                 "current_bill_amount": None,
+                "should_display_current_bill": False,
             },
         )
 
@@ -263,6 +265,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "current_usage": 3,
                 "subscription_url": None,
                 "current_bill_amount": None,
+                "should_display_current_bill": False,
             },
         )
 
@@ -763,6 +766,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
                 "current_usage": None,  # TODO
                 "subscription_url": None,
                 "current_bill_amount": 78.23,
+                "should_display_current_bill": True,
             },
         )
 
@@ -782,6 +786,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(response.json()["current_bill_amount"], None)
+        self.assertEqual(response.json()["should_display_current_bill"], False)
 
     @vcr.use_cassette(cassette_library_dir="multi_tenancy/tests/cassettes", filter_headers=["authorization"])
     def test_failed_request_to_stripe_fails_gracefully(self):
@@ -800,6 +805,7 @@ class TestAPIOrganizationBilling(CloudAPIBaseTest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(response.json()["current_bill_amount"], None)
+        self.assertEqual(response.json()["should_display_current_bill"], True)
 
 
 class PlanAPITestCase(CloudAPIBaseTest):

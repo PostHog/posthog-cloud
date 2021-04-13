@@ -71,6 +71,7 @@ class BillingSerializer(serializers.ModelSerializer):
     current_usage = serializers.SerializerMethodField()
     subscription_url = serializers.SerializerMethodField()
     current_bill_amount = serializers.SerializerMethodField()
+    should_display_current_bill = serializers.SerializerMethodField()
 
     class Meta:
         model = OrganizationBilling
@@ -83,6 +84,7 @@ class BillingSerializer(serializers.ModelSerializer):
             "current_usage",
             "subscription_url",
             "current_bill_amount",
+            "should_display_current_bill",
         ]
 
     def get_current_usage(self, instance: OrganizationBilling) -> Optional[int]:
@@ -119,6 +121,11 @@ class BillingSerializer(serializers.ModelSerializer):
                         )
 
         return f"/billing/setup?session_id={checkout_session}" if checkout_session else None
+
+    def get_should_display_current_bill(self, instance: OrganizationBilling) -> bool:
+        if instance.is_billing_active and instance.plan.is_metered_billing:
+            return True
+        return False
 
     def get_current_bill_amount(self, instance: OrganizationBilling) -> Optional[Decimal]:
         """
