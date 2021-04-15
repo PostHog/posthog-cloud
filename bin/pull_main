@@ -10,5 +10,9 @@ curl -L $TARBALL_URL | tar --strip-components=1 -xz -C deploy --
 cp -r multi_tenancy deploy/
 cp -r messaging deploy/
 
+# Copy NewRelic files
+cp bin/docker-server-newrelic >> deploy/bin/.
+cp newrelic.ini >> deploy/.
+
 cat multi_tenancy_settings.py >> deploy/posthog/settings.py
 cat requirements.txt >> deploy/requirements.txt
