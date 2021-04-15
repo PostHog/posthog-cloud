@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
+from posthog.utils import compact_number
 
 from .models import OrganizationBilling, Plan
 
@@ -20,8 +21,10 @@ class OrganizationBillingAdmin(admin.ModelAdmin):
         "billing_period_ends",
         "plan",
     )
+    readonly_fields = ["stripe", "billing_docs", "is_billing_active", "event_allocation"]
     fields = (
         "organization",
+        "stripe",
         "stripe_customer_id",
         "stripe_subscription_id",
         "stripe_checkout_session",
@@ -40,10 +43,23 @@ class OrganizationBillingAdmin(admin.ModelAdmin):
     def get_organization_name(self, obj):
         return obj.organization.name
 
+    def event_allocation(self, instance: OrganizationBilling) -> str:
+        return "Unlimited" if not instance.event_allocation else compact_number(instance.event_allocation)
+
+    def stripe(self, instance: OrganizationBilling) -> str:
+        if not instance.stripe_customer_id:
+            return "Customer is not registered on Stripe"
+
+        return mark_safe(
+            "View customer on "
+            f'<a href="https://dashboard.stripe.com/customers/{instance.stripe_customer_id}" target="_blank">'
+            "Stripe →</a>",
+        )
+
     def billing_docs(self, *args, **kwargs) -> str:
         return mark_safe(
-            "When changing this object, remember to read"
-            '<a href="https://posthog.com/handbook/growth/sales/billing#updating-subscriptions">'
+            "When changing this object, please <b>remember to read</b> "
+            '<a href="https://posthog.com/handbook/growth/sales/billing#updating-subscriptions" target="_blank">'
             "our internal docs →</a>",
         )
 
