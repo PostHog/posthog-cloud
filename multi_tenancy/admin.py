@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.safestring import mark_safe
 
 from .models import OrganizationBilling, Plan
 
@@ -19,6 +20,18 @@ class OrganizationBillingAdmin(admin.ModelAdmin):
         "billing_period_ends",
         "plan",
     )
+    fields = (
+        "organization",
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "stripe_checkout_session",
+        "plan",
+        "should_setup_billing",
+        "billing_period_ends",
+        "is_billing_active",
+        "event_allocation",
+        "billing_docs",
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -26,6 +39,13 @@ class OrganizationBillingAdmin(admin.ModelAdmin):
 
     def get_organization_name(self, obj):
         return obj.organization.name
+
+    def billing_docs(self, *args, **kwargs) -> str:
+        return mark_safe(
+            "When changing this object, remember to read"
+            '<a href="https://posthog.com/handbook/growth/sales/billing#updating-subscriptions">'
+            "our internal docs →</a>",
+        )
 
 
 @admin.register(Plan)
