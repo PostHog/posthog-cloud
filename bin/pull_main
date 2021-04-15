@@ -10,9 +10,13 @@ curl -L $TARBALL_URL | tar --strip-components=1 -xz -C deploy --
 cp -r multi_tenancy deploy/
 cp -r messaging deploy/
 
-# Copy NewRelic files
-cp bin/docker-server-newrelic >> deploy/bin/.
-cp newrelic.ini >> deploy/.
+# Set up NewRelic
+cp bin/docker-server-newrelic deploy/bin/.
+cp newrelic.ini deploy/.
+# NewRelic for worker (replace in line)
+sed -i.bak "s/celery -A posthog worker \${FLAGS\[\*]}/NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program celery -A posthog worker \${FLAGS\[\*]}/g" deploy/bin/docker-worker-celery && rm deploy/bin/docker-worker-celery.bak
+sed -i.bak "s/celery -A posthog beat -S redbeat.RedBeatScheduler/NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program celery -A posthog beat -S redbeat.RedBeatScheduler/g" deploy/bin/docker-worker-beat && rm deploy/bin/docker-worker-beat.bak
+
 
 cat multi_tenancy_settings.py >> deploy/posthog/settings.py
 cat requirements.txt >> deploy/requirements.txt
