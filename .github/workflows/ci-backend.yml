@@ -76,7 +76,7 @@ jobs:
           CLICKHOUSE_VERIFY: "False"
         run: |
           cd deploy
-          pytest ee/
+          pytest ee/ -m "not skip_on_multitenancy"
 
   cloud:
     name: Local repository tests
