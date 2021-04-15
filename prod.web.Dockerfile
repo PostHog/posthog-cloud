@@ -31,6 +31,13 @@ COPY ./messaging /code/messaging/
 COPY multi_tenancy_settings.py /code/cloud_settings.py
 RUN cat /code/cloud_settings.py >> /code/posthog/settings.py
 
+# Set up NewRelic
+COPY ./bin/docker-server-newrelic /code/bin/.
+COPY ./newrelic.ini /code/.
+# NewRelic for worker (replace in line)
+RUN sed -i.bak "s/celery -A posthog worker \${FLAGS\[\*]}/NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program celery -A posthog worker \${FLAGS\[\*]}/g" /code/bin/docker-worker-celery && rm /code/bin/docker-worker-celery.bak
+RUN sed -i.bak "s/celery -A posthog beat -S redbeat.RedBeatScheduler/NEW_RELIC_CONFIG_FILE=newrelic.ini newrelic-admin run-program celery -A posthog beat -S redbeat.RedBeatScheduler/g" /code/bin/docker-worker-beat && rm /code/bin/docker-worker-beat.bak
+
 # install dependencies but ignore any we don't need for dev environment
 RUN pip install $(grep -ivE "psycopg2" requirements.txt | cut -d'#' -f1) --no-cache-dir --compile\
     && pip install psycopg2-binary --no-cache-dir --compile\
