@@ -571,7 +571,10 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
         sample_webhook_secret: str = "wh_sec_test_abcdefghijklmnopqrstuvwxyz"
         mock_customer_id.return_value = "cus_MeteredI2MVxJI"
         mock_session_data = MagicMock()
-        mock_session_data.to_dict.return_value = {"items": {"data": [{"id": "si_1a2b3c4d", "metadata": {"a": "b"}}]}}
+        mock_session_data.to_dict.return_value = {
+            "id": "sub_1234554321",
+            "items": {"data": [{"id": "si_1a2b3c4d", "metadata": {"a": "b"}}]},
+        }
 
         mock_session_create.return_value = mock_session_data
 
@@ -646,6 +649,7 @@ class TestSpecialWebhookHandling(StripeWebhookTestMixin):
         # Check that the instance is correctly updated
         instance.refresh_from_db()
         self.assertEqual(instance.billing_period_ends, None)  # this is not changed
+        self.assertEqual(instance.stripe_subscription_id, "sub_1234554321")
         self.assertEqual(
             instance.stripe_subscription_item_id, "si_1a2b3c4d",
         )  # subscription ID is updated after subscription is created

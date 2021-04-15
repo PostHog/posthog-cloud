@@ -78,6 +78,9 @@ class OrganizationBilling(models.Model):
     stripe_subscription_id: models.CharField = models.CharField(
         max_length=128, blank=True,
     )
+    stripe_subscription_item_id: models.CharField = models.CharField(
+        max_length=128, blank=True,
+    )  # DEPRECATED: We will use the subscription ID now as tiered or graduated pricing may have multiple items
     checkout_session_created_at: models.DateTimeField = models.DateTimeField(
         null=True, blank=True,
     )
@@ -158,8 +161,9 @@ class OrganizationBilling(models.Model):
             self.billing_period_ends = timezone.now() + datetime.timedelta(days=365)
             self.should_setup_billing = False
         elif self.plan.is_metered_billing:
-            subscription_id, _ = create_subscription(price_id=self.plan.price_id, customer_id=self.stripe_customer_id,)
-            self.stripe_subscription_item_id = subscription_id
+            subscription = create_subscription(price_id=self.plan.price_id, customer_id=self.stripe_customer_id)
+            self.stripe_subscription_item_id = subscription["subscription_item_id"]
+            self.stripe_subscription_id = subscription["subscription_id"]
             self.should_setup_billing = False
         self.save()
         return self

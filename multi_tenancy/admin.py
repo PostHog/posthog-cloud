@@ -13,10 +13,12 @@ class OrganizationBillingAdmin(admin.ModelAdmin):
         "stripe_customer_id",
         "stripe_checkout_session",
         "stripe_subscription_item_id",
+        "stripe_subscription_id",
     )
     list_display = (
         "get_organization_name",
         "stripe_customer_id",
+        "stripe_subscription_id",
         "should_setup_billing",
         "billing_period_ends",
         "plan",

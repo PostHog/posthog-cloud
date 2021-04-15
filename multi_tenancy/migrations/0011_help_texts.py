@@ -11,7 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(model_name="organizationbilling", name="stripe_subscription_item_id",),
         migrations.AlterField(
             model_name="organizationbilling",
             name="billing_period_ends",

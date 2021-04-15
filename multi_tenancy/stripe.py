@@ -89,7 +89,7 @@ def create_zero_auth(email: str, base_url: str, customer_id: str = "") -> Tuple[
     return (session.id, customer_id)
 
 
-def create_subscription(price_id: str = "", customer_id: str = "",) -> Tuple[str, str]:
+def create_subscription(price_id: str = "", customer_id: str = "",) -> Dict[str, str]:
     """
     Creates a subscription for an existing customer with payment details already set up. Used mainly for metered
     plans.
@@ -108,7 +108,11 @@ def create_subscription(price_id: str = "", customer_id: str = "",) -> Tuple[str
 
     subscription_data = subscription.to_dict()
 
-    return (subscription_data["items"]["data"][0]["id"], customer_id)
+    return {
+        "subscription_id": subscription_data["id"],
+        "subscription_item_id": subscription_data["items"]["data"][0]["id"],  # TODO: DEPRECATED
+        "customer_id": customer_id,
+    }
 
 
 def cancel_payment_intent(payment_intent_id: str) -> None:
