@@ -44,7 +44,6 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=('posthog.organization',),
         ),
         migrations.RunPython(forwards_func, reverse_func),
     ]

@@ -1,5 +1,6 @@
-deploy
-env
+deploy/
+env/
+venv/
 .env
 *.pyc
 .DS_Store
