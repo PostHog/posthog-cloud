@@ -66,7 +66,7 @@ class TestTasks(CloudBaseTest):
 
         # another team
         self.assertEqual(
-            mock_create_usage_record.call_args_list[1].args, ("si_1111111111111"),
+            mock_create_usage_record.call_args_list[1].args, ("si_1111111111111",),
         )  # This would be normally be a different ID, but for test purposes, we're mocking the same ID
         self.assertEqual(mock_create_usage_record.call_args_list[1].kwargs["quantity"], 11)
         self.assertEqual(
@@ -97,7 +97,7 @@ class TestTasks(CloudBaseTest):
         plan = Plan.objects.create(key="metered", name="Metered", price_id="m1", is_metered_billing=True)
         org, team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=org, stripe_subscription_item="sub_1111111111111", plan=plan,
+            organization=org, stripe_subscription_id="sub_1111111111111", plan=plan,
         )
 
         subscription_mock = MagicMock()
