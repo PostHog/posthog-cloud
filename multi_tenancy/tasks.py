@@ -21,7 +21,7 @@ def compute_daily_usage_for_organizations(for_date: Optional[datetime.datetime] 
     """
 
     for instance in OrganizationBilling.objects.filter(plan__is_metered_billing=True).exclude(
-        stripe_subscription_item_id=""
+        stripe_subscription_id=""
     ):
         _compute_daily_usage_for_organization.delay(
             organization_billing_pk=str(instance.pk), for_date=for_date,
@@ -49,15 +49,14 @@ def _compute_daily_usage_for_organization(self, organization_billing_pk: str, fo
         raise self.retry()
 
     report_monthly_usage.delay(
-        subscription_item_id=instance.stripe_subscription_item_id, billed_usage=event_usage, for_date=start_time,
+        subscription_id=instance.stripe_subscription_id, billed_usage=event_usage, for_date=start_time,
     )
 
 
 @app.task(bind=True, ignore_result=True, max_retries=3)
-def report_monthly_usage(self, subscription_item_id: str, billed_usage: int, for_date: str) -> None:
+def report_monthly_usage(self, subscription_id: str, billed_usage: int, for_date: str) -> None:
 
-    success = report_subscription_item_usage(
-        subscription_item_id=subscription_item_id, billed_usage=billed_usage, timestamp=dateutil.parser.parse(for_date),
+    success = report_subscription_item_usage(subscription_id=subscription_id, billed_usage=billed_usage, timestamp=dateutil.parser.parse(for_date),
     )
 
     if not success:

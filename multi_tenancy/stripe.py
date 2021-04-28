@@ -142,8 +142,17 @@ def compute_webhook_signature(payload: str, secret: str) -> str:
     return stripe.webhook.WebhookSignature._compute_signature(payload, secret)
 
 
-def report_subscription_item_usage(subscription_item_id: str, billed_usage: int, timestamp: datetime.datetime,) -> bool:
+def report_subscription_item_usage(subscription_id: str, billed_usage: int, timestamp: datetime.datetime,) -> bool:
     _init_stripe()
+
+    subscription = get_subscription(subscription_id)
+    subscription_items = subscription.items.data
+    subscription_item_id = None
+    for item in subscription_items:
+        # if we have multiple items in a subscription, pick one that is metered usage.
+        if subscription_item_id is None or \
+                item.get('price').get('recurring').get('usage_type') == 'metered':
+            subscription_item_id = item.get('id')
 
     # The idempotency_key is the combination of the subscription ID and current timestamp, as we should only report
     # usage once per day, this should ensure no events are doubled counted
