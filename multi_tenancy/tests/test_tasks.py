@@ -1,5 +1,5 @@
 import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytz
 from freezegun import freeze_time
@@ -12,16 +12,25 @@ class TestTasks(CloudBaseTest):
     @freeze_time("2020-05-07")
     @patch("multi_tenancy.stripe._init_stripe")
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
-    def test_compute_daily_usage_for_organizations(self, mock_create_usage_record, _):
+    @patch("multi_tenancy.stripe.stripe.Subscription.retrieve")
+    def test_compute_daily_usage_for_organizations(self, mock_subscription_retrieve, mock_create_usage_record, _):
         plan = Plan.objects.create(key="metered", name="Metered", price_id="m1", is_metered_billing=True)
         org, team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
+            organization=org, stripe_subscription_id="sub_123456789", plan=plan,
         )
         another_org, another_team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=another_org, stripe_subscription_item_id="si_01234567890", plan=plan,
+            organization=another_org, stripe_subscription_id="sub_9876543210", plan=plan,
         )
+
+        subscription_mock = MagicMock()
+        subscription_mock.items.data = {
+            "id": "si_1111111111111",
+            "object": "subscription_item",
+            "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
+        }
+        mock_subscription_retrieve.return_value = subscription_mock
 
         # Some noise events that should be ignored
         with freeze_time("2020-05-07"):  # today
@@ -54,10 +63,12 @@ class TestTasks(CloudBaseTest):
         )
 
         # another team
-        self.assertEqual(mock_create_usage_record.call_args_list[1].args, ("si_01234567890",))
+        self.assertEqual(
+            mock_create_usage_record.call_args_list[1].args, ("si_1111111111111"),
+        )  # This would be normally be a different ID, but for test purposes, we're mocking the same ID
         self.assertEqual(mock_create_usage_record.call_args_list[1].kwargs["quantity"], 11)
         self.assertEqual(
-            mock_create_usage_record.call_args_list[1].kwargs["idempotency_key"], "si_01234567890-2020-05-06",
+            mock_create_usage_record.call_args_list[1].kwargs["idempotency_key"], "si_1111111111111-2020-05-06",
         )
 
     @patch("multi_tenancy.tasks._compute_daily_usage_for_organization")
@@ -79,12 +90,22 @@ class TestTasks(CloudBaseTest):
     @freeze_time("2020-11-11")
     @patch("multi_tenancy.stripe._init_stripe")
     @patch("multi_tenancy.stripe.stripe.SubscriptionItem.create_usage_record")
-    def test_compute_daily_usage_for_different_date(self, mock_create_usage_record, _):
+    @patch("multi_tenancy.stripe.stripe.Subscription.retrieve")
+    def test_compute_daily_usage_for_different_date(self, mock_subscription_retrieve, mock_create_usage_record, _):
         plan = Plan.objects.create(key="metered", name="Metered", price_id="m1", is_metered_billing=True)
         org, team, _ = self.create_org_team_user()
         OrganizationBilling.objects.create(
-            organization=org, stripe_subscription_item_id="si_1111111111111", plan=plan,
+            organization=org, stripe_subscription_item="sub_1111111111111", plan=plan,
         )
+
+        subscription_mock = MagicMock()
+        subscription_mock.items.data = {
+            "id": "si_J2i9eUttdXoSlA",
+            "object": "subscription_item",
+            "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
+        }
+        mock_subscription_retrieve.return_value = subscription_mock
+
         # Some noise events that should be ignored
         with freeze_time("2020-11-11"):  # today
             self.event_factory(team, 4)
@@ -103,8 +124,8 @@ class TestTasks(CloudBaseTest):
         compute_daily_usage_for_organizations(datetime.datetime(2020, 11, 3, tzinfo=pytz.UTC))
         self.assertEqual(mock_create_usage_record.call_count, 1)
 
-        self.assertEqual(mock_create_usage_record.call_args_list[0].args, ("si_1111111111111",))
+        self.assertEqual(mock_create_usage_record.call_args_list[0].args, ("si_J2i9eUttdXoSlA",))
         self.assertEqual(mock_create_usage_record.call_args_list[0].kwargs["quantity"], 16)
         self.assertEqual(
-            mock_create_usage_record.call_args_list[0].kwargs["idempotency_key"], "si_1111111111111-2020-11-03",
+            mock_create_usage_record.call_args_list[0].kwargs["idempotency_key"], "si_J2i9eUttdXoSlA-2020-11-03",
         )
