@@ -25,11 +25,13 @@ class TestTasks(CloudBaseTest):
         )
 
         subscription_mock = MagicMock()
-        subscription_mock.items.data = {
-            "id": "si_1111111111111",
-            "object": "subscription_item",
-            "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
-        }
+        subscription_mock.items.data = [
+            {
+                "id": "si_1111111111111",
+                "object": "subscription_item",
+                "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
+            }
+        ]
         mock_subscription_retrieve.return_value = subscription_mock
 
         # Some noise events that should be ignored
@@ -99,11 +101,13 @@ class TestTasks(CloudBaseTest):
         )
 
         subscription_mock = MagicMock()
-        subscription_mock.items.data = {
-            "id": "si_J2i9eUttdXoSlA",
-            "object": "subscription_item",
-            "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
-        }
+        subscription_mock.items.data = [
+            {
+                "id": "si_J2i9eUttdXoSlA",
+                "object": "subscription_item",
+                "price": {"id": "price_1IhjQeI2", "object": "price", "recurring": {"usage_type": "metered"}},
+            }
+        ]
         mock_subscription_retrieve.return_value = subscription_mock
 
         # Some noise events that should be ignored
