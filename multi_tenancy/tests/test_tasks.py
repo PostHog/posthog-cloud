@@ -101,7 +101,9 @@ class TestTasks(CloudBaseTest):
         )
 
         subscription_mock = MagicMock()
-        subscription_mock.items.data = [
+        items_data = MagicMock()
+        subscription_mock.get.return_value = items_data
+        items_data.get.return_value = [
             {
                 "id": "si_J2i9eUttdXoSlA",
                 "object": "subscription_item",
