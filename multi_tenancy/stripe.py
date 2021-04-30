@@ -146,7 +146,7 @@ def report_subscription_item_usage(subscription_id: str, billed_usage: int, time
     _init_stripe()
 
     subscription = get_subscription(subscription_id)
-    subscription_items = subscription.items.data
+    subscription_items = subscription.get('items', {}).get('data', [])
     subscription_item_id = None
     for item in subscription_items:
         # if we have multiple items in a subscription, pick one that is metered usage.
